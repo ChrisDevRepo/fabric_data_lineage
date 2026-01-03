@@ -86,6 +86,7 @@ export function DataLineageItemEditor(props: PageProps) {
   const [lineageData, setLineageData] = useState<DataNode[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false); // Prevents infinite loop on empty data
 
   // Connection progress state (for progressive loading UI)
   const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>(ConnectionPhase.Idle);
@@ -99,6 +100,7 @@ export function DataLineageItemEditor(props: PageProps) {
   // Source databases (for database selector dropdown)
   const [sources, setSources] = useState<VwSource[]>([]);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
+  const [hasAttemptedLoadSources, setHasAttemptedLoadSources] = useState(false); // Prevents infinite loop on API failure
   const [activeSourceId, setActiveSourceId] = useState<number | undefined>();
 
   const location = useLocation();
@@ -379,11 +381,14 @@ export function DataLineageItemEditor(props: PageProps) {
       setCurrentDefinition(mergedDefinition);
       setSaveStatus(SaveStatus.Saved);
 
-      // If data source changed, clear data and reload
+      // If data source changed, clear data and trigger reload
       if (dataSourceChanged) {
         setLineageData([]);
         setSources([]);
         setActiveSourceId(undefined);
+        setHasAttemptedLoad(false); // Reset to trigger reload
+        setHasAttemptedLoadSources(false); // Reset to trigger sources reload
+        setDataLoadError(null);
         // Clear cache when switching data sources
         if (cacheServiceRef.current) {
           cacheServiceRef.current.clear();
@@ -718,19 +723,23 @@ export function DataLineageItemEditor(props: PageProps) {
   const isSaveEnabled = saveStatus !== SaveStatus.Saved && saveStatus !== SaveStatus.Saving;
 
   // Load sources on initial mount (for database dropdown)
+  // Uses hasAttemptedLoadSources flag to prevent infinite loop when API fails
   useEffect(() => {
-    if (!isLoading && sources.length === 0 && !isLoadingSources) {
+    if (!isLoading && !hasAttemptedLoadSources && !isLoadingSources) {
+      setHasAttemptedLoadSources(true);
       loadSources();
     }
-  }, [isLoading, sources.length, isLoadingSources, loadSources]);
+  }, [isLoading, hasAttemptedLoadSources, isLoadingSources, loadSources]);
 
   // Load data on initial mount (after item is loaded)
+  // Uses hasAttemptedLoad flag to prevent infinite loop when API returns empty data
   useEffect(() => {
-    if (!isLoading && lineageData.length === 0 && !isLoadingData && !dataLoadError) {
+    if (!isLoading && !hasAttemptedLoad && !isLoadingData) {
       // Auto-load data from GraphQL on first render
+      setHasAttemptedLoad(true);
       loadLineageData();
     }
-  }, [isLoading, lineageData.length, isLoadingData, dataLoadError, loadLineageData]);
+  }, [isLoading, hasAttemptedLoad, isLoadingData, loadLineageData]);
 
   // Filter data using exclude patterns from definition
   // Returns { filtered, excludedCount } to show warning badge in toolbar
@@ -770,6 +779,9 @@ export function DataLineageItemEditor(props: PageProps) {
   };
 
   // Memoize the view components to prevent unnecessary re-renders
+  // Detect "connected but empty" state: load completed, no error, but no data
+  const isEmptyData = hasAttemptedLoad && !isLoadingData && lineageData.length === 0 && !dataLoadError;
+
   const emptyViewComponent = useMemo(() => (
     <DataLineageItemEmptyViewSimple
       onOpenSettings={handleOpenSettings}
@@ -781,8 +793,9 @@ export function DataLineageItemEditor(props: PageProps) {
       maxAttempts={DEFAULT_RETRY_CONFIG.maxAttempts}
       hasCache={cacheMetadata?.hasCache || false}
       cacheAge={cacheMetadata?.ageMinutes !== undefined ? formatCacheAge(cacheMetadata.ageMinutes) : undefined}
+      isEmptyData={isEmptyData}
     />
-  ), [handleOpenSettings, handleRetry, isLoadingData, connectionPhase, connectionMessage, connectionAttempt, cacheMetadata]);
+  ), [handleOpenSettings, handleRetry, isLoadingData, connectionPhase, connectionMessage, connectionAttempt, cacheMetadata, isEmptyData]);
 
   // DefaultView receives lineage data from GraphQL and saved preferences
   const defaultViewComponent = useMemo(() => (

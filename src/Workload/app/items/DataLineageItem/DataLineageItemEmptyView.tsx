@@ -28,6 +28,8 @@ interface DataLineageItemEmptyViewProps {
   maxAttempts?: number;
   hasCache?: boolean;
   cacheAge?: string;
+  /** True when connection succeeded but no data was returned (empty database) */
+  isEmptyData?: boolean;
 }
 
 /**
@@ -66,9 +68,10 @@ export function DataLineageItemEmptyViewSimple({
   connectionPhase = ConnectionPhase.Idle,
   connectionMessage,
   connectionAttempt = 0,
-  maxAttempts = 5,
+  maxAttempts = 3,
   hasCache = false,
   cacheAge,
+  isEmptyData = false,
 }: DataLineageItemEmptyViewProps) {
   const isFailed = connectionPhase === ConnectionPhase.Failed;
   const isConnecting = isLoading && !isFailed;
@@ -78,7 +81,63 @@ export function DataLineageItemEmptyViewSimple({
       <DataTreemap24Regular className="data-lineage-empty__icon" />
       <Text className="data-lineage-empty__title">Data Lineage Visualization</Text>
 
-      {isConnecting ? (
+      {isEmptyData ? (
+        // Connected successfully but database has no data
+        <>
+          <Text
+            size={300}
+            style={{
+              marginTop: '16px',
+              color: tokens.colorPaletteMarigoldForeground1,
+              maxWidth: '450px',
+              textAlign: 'center',
+            }}
+          >
+            Connected successfully, but no lineage data found.
+          </Text>
+          <Text
+            size={200}
+            style={{
+              marginTop: '12px',
+              color: tokens.colorNeutralForeground3,
+              maxWidth: '450px',
+              textAlign: 'center',
+            }}
+          >
+            This usually means:
+          </Text>
+          <ul style={{
+            marginTop: '8px',
+            color: tokens.colorNeutralForeground3,
+            fontSize: '12px',
+            textAlign: 'left',
+            paddingLeft: '20px',
+          }}>
+            <li>The Copy Pipeline hasn't been run yet</li>
+            <li>The LineageParser notebook hasn't processed the DDL</li>
+            <li>No source database is marked as active</li>
+          </ul>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+            {onRetry && (
+              <Button
+                appearance="primary"
+                icon={<ArrowClockwise24Regular />}
+                onClick={onRetry}
+              >
+                Retry
+              </Button>
+            )}
+            <Button
+              appearance="secondary"
+              icon={<Settings24Regular />}
+              onClick={onOpenSettings}
+            >
+              Check Settings
+            </Button>
+          </div>
+        </>
+      ) : isConnecting ? (
         // Progressive loading state
         <>
           <div style={{ width: '300px', marginTop: '16px', marginBottom: '8px' }}>

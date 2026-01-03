@@ -83,6 +83,22 @@ pwsh scripts/Run/StartDevGateway.ps1
 pwsh scripts/Run/StartDevServer.ps1
 ```
 
+### Service Principal for CLI Tools
+
+For CLI debugging scripts (e.g., `tools/debug-graphql.ps1`), create a Service Principal:
+
+1. Create SPN in Azure Portal or via `az ad sp create-for-rbac`
+2. Add credentials to `.env`:
+   ```env
+   AZURE_TENANT_ID=your-tenant-id
+   AZURE_CLIENT_ID=your-spn-client-id
+   AZURE_CLIENT_SECRET=your-spn-secret
+   ```
+3. **Grant SPN access to each Fabric workspace** where you want to debug:
+   - Workspace Settings > Manage access > Add the SPN with **Contributor** role
+
+> **Note:** The frontend app uses the user's Fabric token, not the SPN. SPN is only for CLI/pipeline automation.
+
 ## Reference
 
 [Microsoft Fabric Extensibility Toolkit](https://learn.microsoft.com/en-us/fabric/extensibility-toolkit/)

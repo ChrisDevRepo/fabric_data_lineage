@@ -41,7 +41,7 @@ LineageDB
 ### 2. Create GraphQL API
 
 1. Open `LineageDB` in workspace
-2. Select **New** > **GraphQL API**
+2. Select **New API for GraphQL**
 3. Enter name `LineageGraphQL` and click **Create**
 4. Click **Get data** and select these objects:
    - `meta.vw_sources`
@@ -53,56 +53,56 @@ LineageDB
 5. Click **Load**
 6. Copy the **endpoint URL** from the ribbon
 
-### 3. Create Connections
+> **Note - Workspace Access:** Users must have at least **Viewer** access to this workspace to query the GraphQL API. For automated pipelines or CLI debugging using a Service Principal (SPN), the SPN must have **Contributor** access. Go to **Workspace Settings** > **Manage access** to configure permissions.
 
-Before importing the pipeline, create the required connections:
-
-1. Click the **Settings** gear icon (top right) > **Manage connections and gateways**
-2. Select **Connections** tab > **+ New**
-3. Create **Fabric SQL Database** connection → select `LineageDB`
-4. Create **Data Warehouse** connection → select your source warehouse(s)
-
-### 4. Import Notebook
+### 3. Import Notebook
 
 1. **+ New** > **Import** > Select `LineageParser.ipynb`
 2. Open notebook and locate the CONFIG cell (cell 2):
    ```python
-   CONFIG = {"db_name": "metalineage"}
+   CONFIG = {"db_name": "db_datalineage"}
    ```
-3. Change `"metalineage"` to your database name (e.g., `"LineageDB"`)
+3. Change the database name to match your SQL Database name **exactly** (case-sensitive)
 
-### 5. Import Pipeline
+> **Important:** The notebook must be in the **same workspace** as the SQL Database. If you get `Login timeout expired`, verify the database name matches exactly.
+
+### 4. Import Pipeline
 
 Import the pre-built pipeline template that copies metadata from your warehouse.
 
 1. **+ New** > **Data Pipeline** > Name: `CopyLineageData`
 2. In the pipeline editor, click **Import** on the **Home** tab
 3. Select `pipeline_datalineage.zip` from this folder
-4. Map your connections:
-   - **Source**: Select your Data Warehouse connection
-   - **Destination**: Select your LineageDB connection
+4. In the template dialog, configure the connections:
+   - **Warehouse**: Select your source Data Warehouse from OneLake catalog
+   - **SQL Database**: Select your `LineageDB` and create a new connection (e.g., `conn_LineageDB`)
 5. Click **Use this template**
-6. Update the **Notebook activity**:
-   - Click the Notebook activity
-   - Select your `LineageParser` notebook
-7. Click **Save**
+6. Select the **Notebook** activity and configure:
+   - **Workspace**: Select your workspace (e.g., `DataLineage`)
+   - **Notebook**: Select `LineageParser`
+7. Click **Save**, then **Run** to verify the pipeline executes successfully
 
-### 6. Run Pipeline
+> **Note:** Data is ingested to the `raw` schema and prepared in `meta` for visualization.
 
-1. Click **Run**
-2. Wait for completion
-3. Verify data loaded:
-   - Open `LineageDB` in workspace
-   - Expand **Views** > **meta** > **vw_objects**
-   - Click the view to preview data - should show your warehouse objects
-
-### 7. Create Data Lineage Item
+### 5. Create Data Lineage Item
 
 1. **+ New** > **Data Lineage** (under custom workloads)
 2. Open **Settings** > **Connection** tab
 3. Paste the GraphQL endpoint URL (copied in Step 2.6)
 4. Click **Test Connection** > **Save**
 5. Click **Refresh** in toolbar
+
+---
+
+## Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| **401 Unauthorized** | User/SPN lacks workspace access | Add user/SPN to workspace with Viewer+ role |
+| **429 Too Many Requests** | API rate limited | Wait for block to expire (shown in error), then retry |
+| **500 Internal Server Error** | Fabric SQL cold start | Retry after 30-60 seconds (auto-handled by app) |
+| **Empty data** | Pipeline not run or no active source | Run pipeline, check `meta.sources` has `is_active=1` |
+| **Login timeout expired** | Notebook can't connect to DB | Check `CONFIG["db_name"]` matches exactly, notebook in same workspace |
 
 ---
 

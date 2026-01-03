@@ -74,7 +74,7 @@ export interface RetryConfig {
 }
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 5,
+  maxAttempts: 3,
   initialDelayMs: 2000,
   maxDelayMs: 10000,
   backoffMultiplier: 1.5,
@@ -248,18 +248,88 @@ export class LineageService {
   /**
    * Get phase message for retry attempt
    */
-  private getRetryPhaseMessage(attempt: number): { phase: ConnectionPhase; message: string } {
+  private getRetryPhaseMessage(attempt: number, maxAttempts: number): { phase: ConnectionPhase; message: string } {
     if (attempt === 1) {
       return { phase: ConnectionPhase.Connecting, message: 'Connecting to Fabric...' };
     } else if (attempt === 2) {
       return { phase: ConnectionPhase.Authenticating, message: 'Authenticating with Fabric...' };
-    } else if (attempt === 3) {
-      return { phase: ConnectionPhase.WaitingForService, message: 'Waiting for database to start...' };
-    } else if (attempt === 4) {
-      return { phase: ConnectionPhase.WaitingForService, message: 'Service is warming up...' };
-    } else {
+    } else if (attempt === maxAttempts) {
       return { phase: ConnectionPhase.WaitingForService, message: 'Final connection attempt...' };
+    } else {
+      return { phase: ConnectionPhase.WaitingForService, message: 'Waiting for service to start...' };
     }
+  }
+
+  /**
+   * Format error with detailed debug info
+   */
+  private formatErrorWithDetails(
+    error: unknown,
+    context: { status?: number; endpoint?: string; attempt?: number; maxAttempts?: number }
+  ): string {
+    const baseMessage = error instanceof Error ? error.message : String(error);
+    const parts = [baseMessage];
+
+    if (context.status) {
+      parts.push(`[HTTP ${context.status}]`);
+    }
+    if (context.endpoint) {
+      // Extract just the host/path for readability
+      try {
+        const url = new URL(context.endpoint);
+        parts.push(`[${url.hostname}]`);
+      } catch {
+        parts.push(`[${context.endpoint.substring(0, 50)}...]`);
+      }
+    }
+    if (context.attempt && context.maxAttempts) {
+      parts.push(`[Attempt ${context.attempt}/${context.maxAttempts}]`);
+    }
+
+    return parts.join(' ');
+  }
+
+  /**
+   * Execute a GraphQL query against the Fabric SQL Database API (single attempt, no retry)
+   * Used internally by methods that handle retry at a higher level
+   */
+  private async executeQueryDirect<T>(query: string, variables?: Record<string, unknown>): Promise<GraphQLResponse<T>> {
+    if (!this.graphqlEndpoint) {
+      throw new Error('GraphQL endpoint not configured. Please set the endpoint URL first.');
+    }
+
+    // Get access token for Fabric GraphQL API
+    // GraphQL API uses Power BI scope (NOT Fabric API scope)
+    let token;
+    try {
+      token = await this.authService.acquireAccessToken(FABRIC_BASE_SCOPES.POWERBI_API);
+    } catch (tokenError) {
+      const errorMsg = tokenError instanceof Error ? tokenError.message : JSON.stringify(tokenError);
+      throw new Error(`Failed to acquire access token: ${errorMsg}`);
+    }
+
+    const response = await fetch(this.graphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token.token}`,
+      },
+      body: JSON.stringify({
+        query,
+        variables,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const detailedError = this.formatErrorWithDetails(
+        `GraphQL request failed: ${errorText}`,
+        { status: response.status, endpoint: this.graphqlEndpoint }
+      );
+      throw new Error(detailedError);
+    }
+
+    return await response.json();
   }
 
   /**
@@ -277,38 +347,11 @@ export class LineageService {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         // Report progress
-        const { phase, message } = this.getRetryPhaseMessage(attempt);
+        const { phase, message } = this.getRetryPhaseMessage(attempt, maxAttempts);
         this.reportProgress(phase, message, attempt, maxAttempts);
 
-        // Get access token for Fabric GraphQL API
-        // GraphQL API uses Power BI scope (NOT Fabric API scope)
-        let token;
-        try {
-          token = await this.authService.acquireAccessToken(FABRIC_BASE_SCOPES.POWERBI_API);
-        } catch (tokenError) {
-          const errorMsg = tokenError instanceof Error ? tokenError.message : JSON.stringify(tokenError);
-          throw new Error(`Failed to acquire access token: ${errorMsg}`);
-        }
-
-        const response = await fetch(this.graphqlEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token.token}`,
-          },
-          body: JSON.stringify({
-            query,
-            variables,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`GraphQL request failed (${response.status}): ${errorText}`);
-        }
-
-        // Success!
-        return await response.json();
+        const result = await this.executeQueryDirect<T>(query, variables);
+        return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -320,9 +363,13 @@ export class LineageService {
       }
     }
 
-    // All retries exhausted
-    this.reportProgress(ConnectionPhase.Failed, `Connection failed after ${maxAttempts} attempts`);
-    throw lastError || new Error('Connection failed after all retry attempts');
+    // All retries exhausted - format with attempt info
+    const finalError = this.formatErrorWithDetails(
+      lastError?.message || 'Connection failed',
+      { endpoint: this.graphqlEndpoint, attempt: maxAttempts, maxAttempts }
+    );
+    this.reportProgress(ConnectionPhase.Failed, finalError);
+    throw new Error(finalError);
   }
 
   /**
@@ -487,16 +534,15 @@ export class LineageService {
   }
 
   /**
-   * Get all objects from the lineage database for a specific source
-   * Note: Fabric GraphQL defaults to 100 items per page, we request up to 10000
+   * Build query for objects (internal helper)
    */
-  async getObjects(sourceId?: number): Promise<VwObject[]> {
+  private buildObjectsQuery(sourceId?: number): string {
     const filterParts: string[] = ['first: 10000'];
     if (sourceId) {
       filterParts.push(`filter: { source_id: { eq: ${sourceId} } }`);
     }
     const args = `(${filterParts.join(', ')})`;
-    const query = `
+    return `
       query GetObjects {
         vw_objects${args} {
           items {
@@ -511,7 +557,59 @@ export class LineageService {
         }
       }
     `;
+  }
 
+  /**
+   * Build query for definitions (internal helper)
+   */
+  private buildDefinitionsQuery(sourceId?: number): string {
+    const filterParts: string[] = ['first: 10000'];
+    if (sourceId) {
+      filterParts.push(`filter: { source_id: { eq: ${sourceId} } }`);
+    }
+    const args = `(${filterParts.join(', ')})`;
+    return `
+      query GetDefinitions {
+        vw_definitions${args} {
+          items {
+            source_id
+            object_id
+            definition
+          }
+        }
+      }
+    `;
+  }
+
+  /**
+   * Build query for edges (internal helper)
+   */
+  private buildEdgesQuery(sourceId?: number): string {
+    const filterParts: string[] = ['first: 10000'];
+    if (sourceId) {
+      filterParts.push(`filter: { source_id: { eq: ${sourceId} } }`);
+    }
+    const args = `(${filterParts.join(', ')})`;
+    return `
+      query GetEdges {
+        vw_lineage_edges${args} {
+          items {
+            source_id
+            source_object_id
+            target_object_id
+            is_bidirectional
+          }
+        }
+      }
+    `;
+  }
+
+  /**
+   * Get all objects from the lineage database for a specific source
+   * Note: Fabric GraphQL defaults to 100 items per page, we request up to 10000
+   */
+  async getObjects(sourceId?: number): Promise<VwObject[]> {
+    const query = this.buildObjectsQuery(sourceId);
     const result = await this.executeQuery<{
       vw_objects: { items: VwObject[] };
     }>(query);
@@ -528,23 +626,7 @@ export class LineageService {
    * Note: Fabric GraphQL defaults to 100 items per page, we request up to 10000
    */
   async getDefinitions(sourceId?: number): Promise<VwDefinition[]> {
-    const filterParts: string[] = ['first: 10000'];
-    if (sourceId) {
-      filterParts.push(`filter: { source_id: { eq: ${sourceId} } }`);
-    }
-    const args = `(${filterParts.join(', ')})`;
-    const query = `
-      query GetDefinitions {
-        vw_definitions${args} {
-          items {
-            source_id
-            object_id
-            definition
-          }
-        }
-      }
-    `;
-
+    const query = this.buildDefinitionsQuery(sourceId);
     const result = await this.executeQuery<{
       vw_definitions: { items: VwDefinition[] };
     }>(query);
@@ -561,24 +643,7 @@ export class LineageService {
    * Note: Fabric GraphQL defaults to 100 items per page, we request up to 10000
    */
   async getEdges(sourceId?: number): Promise<VwLineageEdge[]> {
-    const filterParts: string[] = ['first: 10000'];
-    if (sourceId) {
-      filterParts.push(`filter: { source_id: { eq: ${sourceId} } }`);
-    }
-    const args = `(${filterParts.join(', ')})`;
-    const query = `
-      query GetEdges {
-        vw_lineage_edges${args} {
-          items {
-            source_id
-            source_object_id
-            target_object_id
-            is_bidirectional
-          }
-        }
-      }
-    `;
-
+    const query = this.buildEdgesQuery(sourceId);
     const result = await this.executeQuery<{
       vw_lineage_edges: { items: VwLineageEdge[] };
     }>(query);
@@ -591,20 +656,102 @@ export class LineageService {
   }
 
   /**
+   * Fetch all data in parallel without individual retry (used by getLineageData)
+   */
+  private async fetchAllDataDirect(sourceId?: number): Promise<{
+    objects: VwObject[];
+    definitions: VwDefinition[];
+    edges: VwLineageEdge[];
+  }> {
+    const objectsQuery = this.buildObjectsQuery(sourceId);
+    const definitionsQuery = this.buildDefinitionsQuery(sourceId);
+    const edgesQuery = this.buildEdgesQuery(sourceId);
+
+    // Execute all queries in parallel (no retry at this level)
+    const [objectsResult, definitionsResult, edgesResult] = await Promise.all([
+      this.executeQueryDirect<{ vw_objects: { items: VwObject[] } }>(objectsQuery),
+      this.executeQueryDirect<{ vw_definitions: { items: VwDefinition[] } }>(definitionsQuery),
+      this.executeQueryDirect<{ vw_lineage_edges: { items: VwLineageEdge[] } }>(edgesQuery),
+    ]);
+
+    // Check for errors
+    const errors: string[] = [];
+    if (objectsResult.errors) {
+      errors.push(`Objects: ${objectsResult.errors.map(e => e.message).join('; ')}`);
+    }
+    if (definitionsResult.errors) {
+      errors.push(`Definitions: ${definitionsResult.errors.map(e => e.message).join('; ')}`);
+    }
+    if (edgesResult.errors) {
+      errors.push(`Edges: ${edgesResult.errors.map(e => e.message).join('; ')}`);
+    }
+    if (errors.length > 0) {
+      throw new Error(`GraphQL errors: ${errors.join(' | ')}`);
+    }
+
+    return {
+      objects: objectsResult.data?.vw_objects?.items || [],
+      definitions: definitionsResult.data?.vw_definitions?.items || [],
+      edges: edgesResult.data?.vw_lineage_edges?.items || [],
+    };
+  }
+
+  /**
    * Get all lineage data and convert to DataNode[] format for ReactFlow
    * This is the main method used by DefaultView to load data
+   *
+   * Retry logic is handled at this level (single retry loop for all parallel calls)
+   * to avoid confusing "1/3, 2/3, 1/3..." progress from multiple parallel retries.
    *
    * Bidirectional flag is computed in SQL view:
    * - vw_lineage_edges.is_bidirectional: reverse edge exists (A→B AND B→A)
    */
   async getLineageData(sourceId?: number): Promise<DataNode[]> {
-    // Fetch all data in parallel
-    const [objects, definitions, edges] = await Promise.all([
-      this.getObjects(sourceId),
-      this.getDefinitions(sourceId),
-      this.getEdges(sourceId),
-    ]);
+    const { maxAttempts } = this.retryConfig;
+    let lastError: Error | null = null;
 
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Report progress (single unified progress for all parallel calls)
+        const { phase, message } = this.getRetryPhaseMessage(attempt, maxAttempts);
+        this.reportProgress(phase, message, attempt, maxAttempts);
+
+        // Fetch all data in parallel (no individual retry)
+        const { objects, definitions, edges } = await this.fetchAllDataDirect(sourceId);
+
+        // Report loading phase
+        this.reportProgress(ConnectionPhase.LoadingData, 'Processing lineage data...', attempt, maxAttempts);
+
+        // Success - convert to DataNode format
+        return this.convertToDataNodes(objects, definitions, edges);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // If this was the last attempt, don't wait
+        if (attempt < maxAttempts) {
+          const delay = this.getRetryDelay(attempt);
+          await this.sleep(delay);
+        }
+      }
+    }
+
+    // All retries exhausted
+    const finalError = this.formatErrorWithDetails(
+      lastError?.message || 'Failed to load lineage data',
+      { endpoint: this.graphqlEndpoint, attempt: maxAttempts, maxAttempts }
+    );
+    this.reportProgress(ConnectionPhase.Failed, finalError);
+    throw new Error(finalError);
+  }
+
+  /**
+   * Convert raw data to DataNode format (extracted for testability)
+   */
+  private convertToDataNodes(
+    objects: VwObject[],
+    definitions: VwDefinition[],
+    edges: VwLineageEdge[]
+  ): DataNode[] {
     // Create lookup maps
     const definitionMap = new Map<number, string>();
     for (const def of definitions) {
@@ -616,13 +763,9 @@ export class LineageService {
     // Build inputs/outputs and bidirectional info from edges
     const inputsMap = new Map<number, number[]>();
     const outputsMap = new Map<number, number[]>();
-    const bidirectionalMap = new Map<number, Set<number>>(); // object_id → set of bidirectional target IDs
+    const bidirectionalMap = new Map<number, Set<number>>();
 
     for (const edge of edges) {
-      // source_object_id -> target_object_id means:
-      // source_object_id has output to target_object_id
-      // target_object_id has input from source_object_id
-
       if (!outputsMap.has(edge.source_object_id)) {
         outputsMap.set(edge.source_object_id, []);
       }
@@ -633,7 +776,6 @@ export class LineageService {
       }
       inputsMap.get(edge.target_object_id)!.push(edge.source_object_id);
 
-      // Track bidirectional relationships (computed in SQL)
       if (edge.is_bidirectional) {
         if (!bidirectionalMap.has(edge.source_object_id)) {
           bidirectionalMap.set(edge.source_object_id, new Set());
@@ -643,13 +785,10 @@ export class LineageService {
     }
 
     // Convert to DataNode format
-    const nodes: DataNode[] = objects.map((obj) => {
+    return objects.map((obj) => {
       const inputs = inputsMap.get(obj.object_id) || [];
       const outputs = outputsMap.get(obj.object_id) || [];
       const bidirectionalIds = bidirectionalMap.get(obj.object_id);
-
-      // Determine if this is an external object (ref_type > 0)
-      // Note: GraphQL may return ref_type as string, so convert to number
       const refType = Number(obj.ref_type) || 0;
       const isExternal = refType > 0;
       const externalRefType: ExternalRefType | undefined = isExternal
@@ -672,8 +811,6 @@ export class LineageService {
         ref_name: obj.ref_name || undefined,
       };
     });
-
-    return nodes;
   }
 
   /**

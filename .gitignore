@@ -41,7 +41,6 @@ test-results/
 tmp/
 
 # Setup internals
-setup/Deploy_DataLineage.Notebook/
 setup/Deploy_DataLineage_Test.ipynb
 
 # DevGateway

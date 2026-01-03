@@ -41,7 +41,6 @@ Source DWH → Copy Activity (Pipeline) → raw.* tables → Notebook → meta.*
 setup/                             # Deployment assets
 ├── schema-ddl.sql                 # Database schema (DDL)
 ├── LineageParser.ipynb            # DDL parsing notebook
-├── Deploy_DataLineage.Notebook/   # Automated deployment
 └── CopyLineageData.DataPipeline/  # Copy pipeline template
 src/Workload/                      # React frontend (Fabric SDK)
 └── app/items/DataLineageItem/     # Main visualization
