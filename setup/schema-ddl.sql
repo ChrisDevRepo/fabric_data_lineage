@@ -1,131 +1,80 @@
 -- ============================================================================
--- DATA LINEAGE - Initial Database Setup
+-- DATA LINEAGE - Database Schema (Idempotent - safe to re-run)
 -- ============================================================================
--- Creates schema for tracking data lineage across Fabric Data Warehouses.
 -- Flow: Source DWH → Copy Pipeline → raw.* → Parser Notebook → meta.* → GraphQL → Frontend
 -- ============================================================================
 
 -- Create schemas
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'raw')
-    EXEC('CREATE SCHEMA raw');
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'raw') EXEC('CREATE SCHEMA raw');
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'meta') EXEC('CREATE SCHEMA meta');
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'meta')
-    EXEC('CREATE SCHEMA meta');
+-- Drop all tables (order matters for dependencies)
+DROP TABLE IF EXISTS meta.parser_log, meta.parsed_edges, meta.lineage_edges, meta.external_objects, meta.sources;
+DROP TABLE IF EXISTS raw.table_columns, raw.dependencies, raw.definitions, raw.objects;
 GO
 
 -- ============================================================================
 -- RAW SCHEMA: Ingestion layer (populated by Copy Pipeline from source DWH)
 -- ============================================================================
 
--- Catalog objects (from sys.objects)
 CREATE TABLE raw.objects (
-    server_name NVARCHAR(128) NULL,
-    database_name NVARCHAR(128) NULL,
-    object_id INT NULL,
-    schema_name NVARCHAR(128) NULL,
-    object_name NVARCHAR(128) NULL,
-    object_type_code NVARCHAR(2) NULL,
-    create_date DATETIME2 NULL,
-    modify_date DATETIME2 NULL
+    server_name NVARCHAR(128), database_name NVARCHAR(128), object_id INT,
+    schema_name NVARCHAR(128), object_name NVARCHAR(128), object_type_code NVARCHAR(2),
+    create_date DATETIME2, modify_date DATETIME2
 );
 
--- DDL definitions (from sys.sql_modules)
 CREATE TABLE raw.definitions (
-    server_name NVARCHAR(128) NULL,
-    database_name NVARCHAR(128) NULL,
-    object_id INT NULL,
-    definition NVARCHAR(MAX) NULL
+    server_name NVARCHAR(128), database_name NVARCHAR(128), object_id INT,
+    definition NVARCHAR(MAX)
 );
 
--- Object dependencies (from sys.sql_expression_dependencies)
 CREATE TABLE raw.dependencies (
-    server_name NVARCHAR(128) NULL,
-    database_name NVARCHAR(128) NULL,
-    referencing_object_id INT NULL,
-    referenced_object_id INT NULL,
-    referenced_database_name NVARCHAR(128) NULL,
-    referencing_schema_name NVARCHAR(128) NULL,
-    referencing_entity_name NVARCHAR(128) NULL,
-    referenced_schema_name NVARCHAR(128) NULL,
-    referenced_entity_name NVARCHAR(128) NULL,
-    referencing_type NVARCHAR(60) NULL,
-    referenced_type NVARCHAR(60) NULL
+    server_name NVARCHAR(128), database_name NVARCHAR(128),
+    referencing_object_id INT, referenced_object_id INT, referenced_database_name NVARCHAR(128),
+    referencing_schema_name NVARCHAR(128), referencing_entity_name NVARCHAR(128),
+    referenced_schema_name NVARCHAR(128), referenced_entity_name NVARCHAR(128),
+    referencing_type NVARCHAR(60), referenced_type NVARCHAR(60)
 );
 
--- Column metadata (from sys.columns, for generating table DDL)
 CREATE TABLE raw.table_columns (
-    server_name NVARCHAR(128) NULL,
-    database_name NVARCHAR(128) NULL,
-    object_id INT NULL,
-    column_id INT NULL,
-    column_name NVARCHAR(128) NULL,
-    data_type NVARCHAR(128) NULL,
-    max_length SMALLINT NULL,
-    precision TINYINT NULL,
-    scale TINYINT NULL,
-    is_nullable BIT NULL,
-    is_identity BIT NULL,
-    schema_name NVARCHAR(128) NULL,
-    table_name NVARCHAR(128) NULL
+    server_name NVARCHAR(128), database_name NVARCHAR(128), object_id INT,
+    column_id INT, column_name NVARCHAR(128), data_type NVARCHAR(128),
+    max_length SMALLINT, precision TINYINT, scale TINYINT,
+    is_nullable BIT, is_identity BIT, schema_name NVARCHAR(128), table_name NVARCHAR(128)
 );
 
 -- ============================================================================
 -- META SCHEMA: Core layer (populated by Parser, exposed via GraphQL)
 -- ============================================================================
 
--- Warehouse registry
 CREATE TABLE meta.sources (
-    source_id INT NOT NULL IDENTITY(1,1),
-    server_name NVARCHAR(256) NOT NULL,
-    database_name NVARCHAR(128) NOT NULL,
-    description NVARCHAR(500) NULL,
-    is_active BIT NOT NULL DEFAULT 0,
-    created_at DATETIME2 NULL DEFAULT GETUTCDATE()
+    source_id INT NOT NULL IDENTITY(1,1), server_name NVARCHAR(256) NOT NULL,
+    database_name NVARCHAR(128) NOT NULL, description NVARCHAR(500),
+    is_active BIT NOT NULL DEFAULT 0, created_at DATETIME2 DEFAULT GETUTCDATE()
 );
 
--- External references (negative IDs; ref_type: 1=FILE, 2=OTHER_DB, 3=LINK)
 CREATE TABLE meta.external_objects (
-    object_id BIGINT NOT NULL IDENTITY(-1,-1),
-    source_id INT NOT NULL,
-    ref_type TINYINT NOT NULL,
-    ref_name NVARCHAR(500) NOT NULL,
-    display_name NVARCHAR(256) NOT NULL
+    object_id BIGINT NOT NULL IDENTITY(-1,-1), source_id INT NOT NULL,
+    ref_type TINYINT NOT NULL, ref_name NVARCHAR(500) NOT NULL, display_name NVARCHAR(256) NOT NULL
 );
 
--- Final lineage edges (merged from DMV + parser)
 CREATE TABLE meta.lineage_edges (
-    source_id INT NOT NULL,
-    source_object_id BIGINT NOT NULL,
-    target_object_id BIGINT NOT NULL,
-    source_type TINYINT NOT NULL,
-    target_type TINYINT NOT NULL
+    source_id INT NOT NULL, source_object_id BIGINT NOT NULL, target_object_id BIGINT NOT NULL,
+    source_type TINYINT NOT NULL, target_type TINYINT NOT NULL
 );
 
--- Parser output edges (input for sp_compute_lineage)
 CREATE TABLE meta.parsed_edges (
-    source_id INT NOT NULL,
-    source_object_id BIGINT NOT NULL,
-    target_object_id BIGINT NOT NULL,
-    source_type TINYINT NOT NULL,
-    target_type TINYINT NOT NULL
+    source_id INT NOT NULL, source_object_id BIGINT NOT NULL, target_object_id BIGINT NOT NULL,
+    source_type TINYINT NOT NULL, target_type TINYINT NOT NULL
 );
 
--- Parser debug logs
 CREATE TABLE meta.parser_log (
-    log_id INT NOT NULL IDENTITY(1,1),
-    run_id UNIQUEIDENTIFIER NOT NULL,
-    run_started_at DATETIME2 NOT NULL,
-    db_name NVARCHAR(128) NOT NULL,
-    server_name NVARCHAR(256) NOT NULL,
-    sp_object_id BIGINT NOT NULL,
-    sp_full_name NVARCHAR(257) NOT NULL,
-    raw_ddl NVARCHAR(MAX) NULL,
-    cleaned_ddl NVARCHAR(MAX) NULL,
-    parsing_steps NVARCHAR(MAX) NULL,
-    edge_count INT NOT NULL,
-    status NVARCHAR(50) NOT NULL,
-    error_message NVARCHAR(MAX) NULL
+    log_id INT NOT NULL IDENTITY(1,1), run_id UNIQUEIDENTIFIER NOT NULL,
+    run_started_at DATETIME2 NOT NULL, db_name NVARCHAR(128) NOT NULL, server_name NVARCHAR(256) NOT NULL,
+    sp_object_id BIGINT NOT NULL, sp_full_name NVARCHAR(257) NOT NULL,
+    raw_ddl NVARCHAR(MAX), cleaned_ddl NVARCHAR(MAX), parsing_steps NVARCHAR(MAX),
+    edge_count INT NOT NULL, status NVARCHAR(50) NOT NULL, error_message NVARCHAR(MAX)
 );
 GO
 
@@ -134,13 +83,13 @@ GO
 -- ============================================================================
 
 -- Source dropdown list
-CREATE VIEW meta.vw_sources AS
+CREATE OR ALTER VIEW meta.vw_sources AS
 SELECT source_id, database_name, description, is_active, created_at
 FROM meta.sources;
 GO
 
 -- DDL for code viewer (raw definitions + generated CREATE TABLE)
-CREATE VIEW meta.vw_definitions AS
+CREATE OR ALTER VIEW meta.vw_definitions AS
 SELECT s.source_id, d.object_id, d.definition
 FROM raw.definitions d
 INNER JOIN meta.sources s ON d.server_name = s.server_name AND d.database_name = s.database_name
@@ -179,7 +128,7 @@ GROUP BY s.source_id, tc.object_id, o.schema_name, o.object_name;
 GO
 
 -- Edges with bidirectional flag for graph rendering
-CREATE VIEW meta.vw_lineage_edges AS
+CREATE OR ALTER VIEW meta.vw_lineage_edges AS
 SELECT
     e.source_id,
     e.source_object_id,
@@ -198,7 +147,7 @@ WHERE s.is_active = 1;
 GO
 
 -- Objects for graph nodes (local + external with edges)
-CREATE VIEW meta.vw_objects AS
+CREATE OR ALTER VIEW meta.vw_objects AS
 SELECT
     s.source_id,
     o.object_id,
@@ -236,7 +185,7 @@ WHERE s.is_active = 1
 GO
 
 -- Parser log flattened for debugging
-CREATE VIEW meta.vw_parser_log_steps AS
+CREATE OR ALTER VIEW meta.vw_parser_log_steps AS
 SELECT
     pl.log_id,
     pl.run_id,
@@ -274,7 +223,7 @@ GO
 -- ============================================================================
 
 -- Reset all meta tables for fresh parse run
-CREATE PROCEDURE meta.sp_clear_parser_cache
+CREATE OR ALTER PROCEDURE meta.sp_clear_parser_cache
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -287,7 +236,7 @@ END;
 GO
 
 -- Merge DMV + parser edges into final lineage_edges
-CREATE PROCEDURE meta.sp_compute_lineage
+CREATE OR ALTER PROCEDURE meta.sp_compute_lineage
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -367,19 +316,26 @@ BEGIN
 END;
 GO
 
--- Get object catalog for parser validation
-CREATE PROCEDURE meta.sp_get_catalog
+-- Get object catalog for parser validation (returns source_id for parser)
+CREATE OR ALTER PROCEDURE meta.sp_get_catalog
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT s.source_id, o.object_id, LOWER(o.schema_name + '.' + o.object_name) AS full_name
+    SELECT s.source_id, o.object_id, LOWER(o.schema_name + '.' + o.object_name) AS full_name,
+        CASE
+            WHEN o.object_type_code = 'U' THEN 'Table'
+            WHEN o.object_type_code = 'V' THEN 'View'
+            WHEN o.object_type_code = 'P' THEN 'Stored Procedure'
+            WHEN o.object_type_code IN ('FN', 'IF', 'TF') THEN 'Function'
+            ELSE o.object_type_code
+        END AS object_type
     FROM raw.objects o
     INNER JOIN meta.sources s ON o.server_name = s.server_name AND o.database_name = s.database_name;
 END;
 GO
 
 -- Get SP definitions for DDL parsing
-CREATE PROCEDURE meta.sp_get_sp_definitions
+CREATE OR ALTER PROCEDURE meta.sp_get_sp_definitions
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -393,7 +349,7 @@ END;
 GO
 
 -- Get View/Function definitions for external ref parsing
-CREATE PROCEDURE meta.sp_get_view_definitions
+CREATE OR ALTER PROCEDURE meta.sp_get_view_definitions
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -407,7 +363,7 @@ END;
 GO
 
 -- Save external objects from parser
-CREATE PROCEDURE meta.sp_save_external_objects
+CREATE OR ALTER PROCEDURE meta.sp_save_external_objects
     @objects_json NVARCHAR(MAX)
 AS
 BEGIN
@@ -426,7 +382,7 @@ END;
 GO
 
 -- Save parsed edges from parser
-CREATE PROCEDURE meta.sp_save_parsed_edges
+CREATE OR ALTER PROCEDURE meta.sp_save_parsed_edges
     @edges_json NVARCHAR(MAX)
 AS
 BEGIN
@@ -482,7 +438,7 @@ END;
 GO
 
 -- Save parser debug logs
-CREATE PROCEDURE meta.sp_save_parser_log
+CREATE OR ALTER PROCEDURE meta.sp_save_parser_log
     @logs_json NVARCHAR(MAX)
 AS
 BEGIN
@@ -524,7 +480,7 @@ END;
 GO
 
 -- Search DDL by text pattern
-CREATE PROCEDURE meta.sp_search_ddl
+CREATE OR ALTER PROCEDURE meta.sp_search_ddl
     @query NVARCHAR(500),
     @schemas NVARCHAR(2000) = NULL,
     @types NVARCHAR(500) = NULL,
@@ -617,7 +573,7 @@ END;
 GO
 
 -- Set active source warehouse
-CREATE PROCEDURE meta.sp_set_active_source
+CREATE OR ALTER PROCEDURE meta.sp_set_active_source
     @source_id INT = NULL
 AS
 BEGIN
