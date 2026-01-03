@@ -1,0 +1,32 @@
+name: Security Scan
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@v3.88.0
+        with:
+          extra_args: --only-verified
+      - name: Check for .env files
+        run: |
+          # Find .env files excluding allowed patterns (example, template, sample)
+          found=$(find . -type f \( -name ".env" -o -name ".env.*" \) \
+            ! -name "*.example" \
+            ! -name "*.template" \
+            ! -name "sample.env" \
+            -not -path "./node_modules/*" \
+            2>/dev/null || true)
+          if [ -n "$found" ]; then
+            echo "ERROR: .env files found that should not be committed:"
+            echo "$found"
+            exit 1
+          fi
+          echo "No problematic .env files found"

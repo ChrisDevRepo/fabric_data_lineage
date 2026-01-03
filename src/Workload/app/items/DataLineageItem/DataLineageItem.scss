@@ -1,0 +1,1131 @@
+/**
+ * DataLineageItem Styles
+ * Uses Fabric design tokens for consistency
+ */
+
+.data-lineage-graph {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: var(--colorNeutralBackground2);
+}
+
+// Modern node styling with left accent bar for schema colors
+// - Left bar (4px): schema color via --node-accent-color CSS variable
+// - Background: neutral (theme-aware)
+// - Border: Local objects have solid border, External objects have dashed border
+// - Shape: Tables/Views rectangular, SPs/Functions pill-shaped (via border-radius)
+// Note: Width is calculated in JS based on 90th percentile of name lengths (140-180px)
+.data-lineage-node {
+  position: relative; // For absolute positioning of badges and left bar
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  padding-left: calc(var(--spacingHorizontalM) + 8px); // Extra space for left bar
+  min-width: 140px;  // Fallback if nodeWidth not provided
+  max-width: 180px;  // Fallback if nodeWidth not provided
+  font-size: var(--fontSizeBase200);
+  box-shadow: var(--shadow4);
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
+  overflow: hidden; // Clip left bar to rounded corners
+  cursor: grab !important; // Override ReactFlow's pointer cursor to avoid flickering
+
+  // Left accent bar (schema color)
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background-color: var(--node-accent-color, var(--colorBrandBackground));
+    // No border-radius needed - overflow:hidden clips to node shape
+  }
+
+  // State modifiers - override inline styles where needed
+  &--selected {
+    box-shadow: var(--shadow8), 0 0 0 2px var(--colorBrandStroke1) !important;
+  }
+
+  &--highlighted {
+    box-shadow: var(--shadow8), 0 0 0 2px var(--colorPaletteYellowBorder1) !important;
+  }
+
+  // Trace mode styles
+  &--traced {
+    box-shadow: var(--shadow8), 0 0 0 2px var(--colorPaletteBlueBorder1) !important;
+  }
+
+  &--trace-start {
+    box-shadow: var(--shadow8), 0 0 0 3px var(--colorPaletteGreenBorder1) !important;
+  }
+
+  &--dimmed {
+    opacity: 0.3;
+    filter: grayscale(50%);
+  }
+
+  &__name {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+    font-weight: var(--fontWeightSemibold);
+    font-size: var(--fontSizeBase300);
+    color: var(--colorNeutralForeground1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+
+  // Data model type icon (Dimension, Fact, Other)
+  &__model-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--colorNeutralForeground2);
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacingHorizontalS);
+  }
+
+  &__schema {
+    font-size: var(--fontSizeBase100);
+    color: var(--colorNeutralForeground3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__type {
+    font-size: var(--fontSizeBase100);
+    color: var(--colorNeutralForeground2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+
+  // External indicator badge (top-right corner, gray)
+  // Shows for external objects (files, other DBs, links)
+  &__external-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--colorNeutralBackground3);
+    color: var(--colorNeutralForeground3);
+    border-radius: 50%;
+    box-shadow: var(--shadow4);
+    z-index: 10;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  // External node modifier
+  // - Transparent fill (no background)
+  // - No left accent bar
+  // - Dashed border is handled inline
+  &--external {
+    background-color: transparent !important;
+
+    // Hide the left accent bar for external nodes
+    &::before {
+      display: none;
+    }
+
+    // Adjust padding since there's no left bar
+    padding-left: var(--spacingHorizontalM);
+  }
+}
+
+// Empty view styles
+.data-lineage-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacingVerticalXXL);
+  text-align: center;
+
+  &__icon {
+    font-size: 64px;
+    color: var(--colorNeutralForeground4);
+    margin-bottom: var(--spacingVerticalL);
+  }
+
+  &__title {
+    font-size: var(--fontSizeBase500);
+    font-weight: var(--fontWeightSemibold);
+    color: var(--colorNeutralForeground1);
+    margin-bottom: var(--spacingVerticalS);
+  }
+
+  &__description {
+    font-size: var(--fontSizeBase300);
+    color: var(--colorNeutralForeground2);
+    max-width: 400px;
+    margin-bottom: var(--spacingVerticalL);
+  }
+}
+
+// Default view layout
+// CRITICAL: Use calc() to fill viewport minus ribbon/toolbar heights
+// Fabric iframe defaults to 102vh, but we need to account for:
+// - Ribbon (~44px), Tab bar (~40px), Fabric header (~48px)
+.data-lineage-view {
+  display: flex;
+  flex-direction: column;
+  // Maximize available space - only subtract essential Fabric chrome
+  height: calc(100vh - 90px);
+  min-height: 500px;
+  padding: 0;
+
+  &__toolbar {
+    display: flex;
+    gap: var(--spacingHorizontalM);
+    margin-bottom: var(--spacingVerticalM);
+    flex-wrap: wrap;
+    flex-shrink: 0; // Don't shrink toolbar
+  }
+
+  &__graph-container {
+    flex: 1;
+    border: 1px solid var(--colorNeutralStroke2);
+    border-radius: var(--borderRadiusMedium);
+    overflow: hidden;
+    min-height: 300px;
+    position: relative; // For absolute positioned DDL viewer panel
+
+    // Full height variant (no embedded toolbar)
+    &--full {
+      border: none;
+      border-radius: 0;
+    }
+  }
+
+  &__stats {
+    display: flex;
+    gap: var(--spacingHorizontalL);
+    padding: var(--spacingVerticalS) 0;
+    font-size: var(--fontSizeBase200);
+    color: var(--colorNeutralForeground2);
+    flex-shrink: 0;
+  }
+}
+
+// Expanded (fullscreen-like) view
+.data-lineage-expanded {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--colorNeutralBackground2);
+  overflow: hidden;
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+    background: var(--colorNeutralBackground1);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+    height: 40px;
+    flex-shrink: 0;
+  }
+
+  &__toolbar-left,
+  &__toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__toolbar-center {
+    display: flex;
+    align-items: center;
+  }
+
+  &__content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+
+    // Override the inner view height in expanded mode
+    .data-lineage-view {
+      height: 100%;
+      // Reduce toolbar height in expanded mode
+      .lineage-toolbar {
+        padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+      }
+    }
+  }
+
+  &__loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+  }
+}
+
+// ReactFlow overrides
+.react-flow {
+  background: var(--colorNeutralBackground2) !important;
+}
+
+// Edge styling - very thin lines for cleaner graph appearance
+.react-flow__edge-path {
+  stroke: var(--colorNeutralForeground4);
+  stroke-width: 0.25px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--colorBrandStroke1);
+  stroke-width: 1px;
+}
+
+// Traced edge styling
+.react-flow__edge.traced .react-flow__edge-path {
+  stroke: var(--colorPaletteBlueBorder1);
+  stroke-width: 1px;
+}
+
+// Dimmed edge styling (for non-traced edges when trace is active)
+.react-flow__edge.dimmed .react-flow__edge-path {
+  stroke: var(--colorNeutralStroke2);
+  stroke-width: 0.25px;
+  opacity: 0.3;
+}
+
+.react-flow__edge.dimmed .react-flow__edge-textbg,
+.react-flow__edge.dimmed .react-flow__edge-text {
+  opacity: 0.3;
+}
+
+.react-flow__controls {
+  background: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  box-shadow: var(--shadow4);
+}
+
+.react-flow__controls-button {
+  background: var(--colorNeutralBackground1);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+
+  &:hover {
+    background: var(--colorNeutralBackground1Hover);
+  }
+
+  svg {
+    fill: var(--colorNeutralForeground1);
+  }
+}
+
+.react-flow__minimap {
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+}
+
+// Toolbar styles
+.lineage-toolbar {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+  background: var(--colorNeutralBackground1);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+
+  &__main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__stats-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    color: var(--colorNeutralForeground2);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  &__search {
+    position: relative;
+    min-width: 350px;
+  }
+
+  &__search-input {
+    width: 100%;
+  }
+
+  &__search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke1);
+    border-radius: var(--borderRadiusMedium);
+    box-shadow: var(--shadow16);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  &__search-result {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    cursor: pointer;
+    gap: var(--spacingHorizontalS);
+
+    &:hover {
+      background: var(--colorNeutralBackground1Hover);
+    }
+  }
+
+  &__search-result-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__search-result-meta {
+    color: var(--colorNeutralForeground3);
+  }
+
+  &__search-result-trace {
+    flex-shrink: 0;
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &__badge {
+    margin-left: var(--spacingHorizontalXS);
+  }
+
+  &__popover {
+    padding: var(--spacingVerticalM);
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  &__popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacingVerticalS);
+    padding-bottom: var(--spacingVerticalS);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+  }
+
+  &__popover-actions {
+    display: flex;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__popover-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacingVerticalXS);
+  }
+
+  &__schema-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__star-btn {
+    flex-shrink: 0;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--colorPaletteYellowForeground1);
+    }
+  }
+
+  // Wide popover variant for combined types dropdown
+  &__popover--wide {
+    min-width: 280px;
+  }
+
+  // Section grouping styles (for combined Object Types + Data Model Types)
+  &__popover-section {
+    margin-top: var(--spacingVerticalS);
+
+    &:first-of-type {
+      margin-top: 0;
+    }
+  }
+
+  // Section header (OBJECT TYPES, DATA MODEL TYPES)
+  &__section-header {
+    display: block;
+    margin-bottom: var(--spacingVerticalS);
+    color: var(--colorNeutralForeground3);
+    font-size: var(--fontSizeBase100);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  // Divider between sections
+  &__popover-divider {
+    height: 1px;
+    background: var(--colorNeutralStroke2);
+    margin: var(--spacingVerticalM) 0;
+  }
+}
+
+// ============================================================================
+// Shared Filter Popover Styles
+// Used by: DataLineageSearchPage filter dropdowns
+// ============================================================================
+
+.filter-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacingVerticalS);
+  padding-bottom: var(--spacingVerticalS);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+
+.filter-popover-actions {
+  display: flex;
+  gap: var(--spacingHorizontalXS);
+}
+
+.filter-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+}
+
+// Override Fluent UI Tooltip surface width constraint
+// Fluent tooltips are portaled, so we target by role and content
+[role="tooltip"]:has(.data-lineage-node-tooltip) {
+  max-width: none !important;
+}
+
+// Fallback for browsers without :has() support - target Fluent class directly
+.fui-Tooltip:has(.data-lineage-node-tooltip) {
+  max-width: none !important;
+}
+
+// Node tooltip styles - Fabric UX compliant
+.data-lineage-node-tooltip {
+  display: block;
+  box-sizing: border-box;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  font-family: var(--fontFamilyBase);
+
+  // Primary: Full qualified object name
+  &__name {
+    font-size: var(--fontSizeBase300);
+    font-weight: var(--fontWeightSemibold);
+    color: var(--colorNeutralForeground1);
+    font-family: var(--fontFamilyMonospace);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: var(--lineHeightBase300);
+  }
+
+  // Secondary: Type and connection info
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+    margin-top: var(--spacingVerticalXXS);
+    font-size: var(--fontSizeBase200);
+    line-height: var(--lineHeightBase200);
+    color: var(--colorNeutralForeground2);
+  }
+
+  &__separator {
+    color: var(--colorNeutralForeground4);
+  }
+
+  &__connections {
+    display: flex;
+    gap: var(--spacingHorizontalS);
+    font-family: var(--fontFamilyMonospace);
+    font-size: var(--fontSizeBase100);
+  }
+
+  // Tertiary: Data model classification
+  &__classification {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+    margin-top: var(--spacingVerticalXS);
+    padding-top: var(--spacingVerticalXXS);
+    border-top: 1px solid var(--colorNeutralStroke2);
+    font-size: var(--fontSizeBase100);
+    color: var(--colorNeutralForeground3);
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  // Status badges
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacingHorizontalXS);
+    margin-top: var(--spacingVerticalXS);
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--spacingHorizontalXS);
+    border-radius: var(--borderRadiusSmall);
+    font-size: var(--fontSizeBase100);
+    font-weight: var(--fontWeightMedium);
+
+    &--trace {
+      background: var(--colorPaletteGreenBackground2);
+      color: var(--colorPaletteGreenForeground1);
+    }
+  }
+}
+
+// Trace Controls styles
+.trace-controls {
+  &__body {
+    flex: 1;
+  }
+
+  &__content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalL);
+    flex-wrap: wrap;
+  }
+
+  &__field {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+  }
+
+  &__node-name {
+    color: var(--colorBrandForeground1);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__level-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__icon {
+    color: var(--colorNeutralForeground2);
+  }
+
+  &__spin {
+    width: 70px;
+  }
+}
+
+.trace-active-banner {
+  // Uses default MessageBar styling
+}
+
+// Demo Mode Banner styles
+.demo-mode-banner {
+  // Uses default MessageBar info styling
+  // Positioned at top of view, above toolbar
+}
+
+// Node Context Menu styles
+.node-context-menu {
+  background: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  box-shadow: var(--shadow16);
+  min-width: 200px;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    background: var(--colorNeutralBackground2);
+  }
+
+  &__schema {
+    font-size: var(--fontSizeBase100);
+    color: var(--colorNeutralForeground3);
+  }
+
+  &__name {
+    font-weight: var(--fontWeightSemibold);
+    color: var(--colorNeutralForeground1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// Legend styles
+.lineage-legend {
+  position: absolute;
+  top: var(--spacingVerticalM);
+  left: var(--spacingHorizontalM);
+  background: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  box-shadow: var(--shadow8);
+  z-index: 10;
+  min-width: 150px;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &__toggle {
+    width: 100%;
+    justify-content: space-between;
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  }
+
+  &__content {
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    padding-top: 0;
+  }
+
+  &__section {
+    margin-bottom: var(--spacingVerticalS);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  &__section-title {
+    display: block;
+    margin-bottom: var(--spacingVerticalXS);
+    color: var(--colorNeutralForeground2);
+  }
+
+  &__items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacingVerticalXXS);
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+  }
+
+  &__color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  &__type-indicator {
+    width: 16px;
+    height: 12px;
+    background: var(--colorNeutralBackground3);
+    border-left: 3px solid;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  &__type-name {
+    color: var(--colorNeutralForeground3);
+  }
+
+  &__more {
+    padding: 0;
+    min-height: auto;
+    font-size: var(--fontSizeBase200);
+  }
+}
+
+// DDL Viewer Panel styles
+.ddl-viewer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 45%;
+  min-width: 400px;
+  max-width: 800px;
+  background: var(--colorNeutralBackground1);
+  border-left: 1px solid var(--colorNeutralStroke1);
+  box-shadow: var(--shadow16);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    background: var(--colorNeutralBackground2);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+    flex-shrink: 0;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__icon {
+    color: var(--colorBrandForeground1);
+    flex-shrink: 0;
+  }
+
+  &__title-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    > span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXS);
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: var(--spacingVerticalM);
+    padding: var(--spacingVerticalXXL);
+    text-align: center;
+  }
+
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+    background: var(--colorNeutralBackground2);
+    border-top: 1px solid var(--colorNeutralStroke2);
+    flex-shrink: 0;
+
+    kbd {
+      background: var(--colorNeutralBackground4);
+      padding: 2px 6px;
+      border-radius: var(--borderRadiusSmall);
+      border: 1px solid var(--colorNeutralStroke1);
+      font-family: var(--fontFamilyMonospace);
+      font-size: var(--fontSizeBase100);
+    }
+  }
+}
+
+// Monaco Editor overrides for DDL panel
+.ddl-viewer-panel .monaco-editor {
+  .margin {
+    background: var(--colorNeutralBackground2);
+  }
+
+  // Remove all title attributes to prevent native browser tooltips
+  [title] {
+    pointer-events: auto;
+  }
+}
+
+// Hide all Monaco tooltips in DDL viewer (portaled outside .monaco-editor)
+.monaco-hover,
+.monaco-editor-hover,
+.monaco-hover-content {
+  display: none !important;
+}
+
+// ============================================================================
+// Detail Search Page Styles
+// ============================================================================
+
+.data-lineage-search {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--colorNeutralBackground1);
+  overflow: hidden;
+
+  // Header with search bar and filters
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    background: var(--colorNeutralBackground2);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+    flex-shrink: 0;
+    gap: var(--spacingHorizontalM);
+  }
+
+  &__header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    flex-shrink: 0;
+  }
+
+  &__header-center {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    flex: 1;
+    justify-content: center;
+  }
+
+  &__header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    flex-shrink: 0;
+  }
+
+  &__search-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+  }
+
+  &__search-input {
+    width: 350px;
+    max-width: 100%;
+  }
+
+  &__filter-popover {
+    padding: var(--spacingVerticalM);
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  // Main content area with resizable panels
+  &__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  // Results panel (top)
+  &__results-panel {
+    overflow-y: auto;
+    background: var(--colorNeutralBackground1);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+  }
+
+  // Resize handle between panels
+  &__resize-handle {
+    height: 8px;
+    background: var(--colorNeutralBackground3);
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &:hover {
+      background: var(--colorNeutralBackground3Hover);
+    }
+
+    &:active {
+      background: var(--colorBrandBackground2);
+    }
+  }
+
+  &__resize-handle-bar {
+    width: 40px;
+    height: 4px;
+    background: var(--colorNeutralStroke1);
+    border-radius: 2px;
+  }
+
+  // DDL Viewer panel (bottom)
+  &__ddl-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--colorNeutralBackground1);
+  }
+
+  // Results list container
+  &__results-list {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacingVerticalXS) 0;
+  }
+
+  // Empty state for results
+  &__results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacingVerticalXXL);
+    height: 100%;
+    text-align: center;
+  }
+
+  // Individual result item
+  &__result {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacingHorizontalS);
+    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background-color 0.1s ease, border-color 0.1s ease;
+
+    &:hover {
+      background: var(--colorNeutralBackground1Hover);
+    }
+
+    &--selected {
+      background: var(--colorNeutralBackground1Selected);
+      border-left-color: var(--colorBrandStroke1);
+    }
+  }
+
+  &__result-check {
+    flex-shrink: 0;
+    width: 20px;
+    color: var(--colorBrandForeground1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 2px;
+  }
+
+  &__result-icon {
+    flex-shrink: 0;
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 2px;
+  }
+
+  &__result-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__result-name {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacingHorizontalXS);
+  }
+
+  &__result-snippet {
+    margin-top: var(--spacingVerticalXS);
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+    background: var(--colorNeutralBackground3);
+    border-radius: var(--borderRadiusSmall);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+
+    // Wrap on larger screens
+    @media (min-width: 800px) {
+      white-space: normal;
+      max-height: 40px;
+      overflow: hidden;
+    }
+  }
+}
+
+// ============================================
+// RIBBON DATABASE DROPDOWN
+// ============================================
+// Wrapper for ribbon with database dropdown
+// Positions dropdown in the ribbon header area (after Save, before other actions)
+
+.data-lineage-ribbon-wrapper {
+  position: relative;
+}
+
+.data-lineage-ribbon-database {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 40px; // Match ribbon header height
+  display: flex;
+  align-items: center;
+  padding-right: var(--spacingHorizontalL);
+  z-index: 10;
+}

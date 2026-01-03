@@ -1,0 +1,48 @@
+# Environment
+.env
+.env.*
+!src/Workload/.env.example
+!src/Workload/.env.template
+
+# Internal (not for public repo)
+.claude/
+CLAUDE.md
+.mcp.json
+src/docs/
+tools/
+
+# Build
+build/
+dist/
+*.nupkg
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test
+coverage/
+test-results/
+
+# Temp
+*.tmp
+tmp/
+
+# Setup internals
+setup/Deploy_DataLineage.Notebook/
+setup/Deploy_DataLineage_Test.ipynb
+
+# DevGateway
+scripts/tools/DevGateway/

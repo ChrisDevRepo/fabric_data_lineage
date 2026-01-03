@@ -1,0 +1,680 @@
+[
+  {
+    "id": "999_1",
+    "name": "Customers",
+    "schema": "Staging",
+    "object_type": "Table",
+    "outputs": [
+      "999_11",
+      "999_12"
+    ],
+    "description": "Customer master data",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_2",
+    "name": "Orders",
+    "schema": "Staging",
+    "object_type": "Table",
+    "inputs": [],
+    "outputs": [
+      "999_12"
+    ],
+    "description": "Sales order transactions",
+    "data_model_type": "Fact"
+  },
+  {
+    "id": "999_3",
+    "name": "Products",
+    "schema": "Staging",
+    "object_type": "Table",
+    "outputs": [
+      "999_13"
+    ],
+    "description": "Product catalog",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_4",
+    "name": "OrderItems",
+    "schema": "Staging",
+    "object_type": "Table",
+    "outputs": [
+      "999_10"
+    ],
+    "description": "Order line items",
+    "data_model_type": "Fact",
+    "inputs": []
+  },
+  {
+    "id": "999_7",
+    "name": "stg_Customers",
+    "schema": "Staging",
+    "object_type": "Table",
+    "inputs": [
+      "999_11"
+    ],
+    "outputs": [
+      "999_17"
+    ],
+    "description": "Staged customer data",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_8",
+    "name": "stg_Orders",
+    "schema": "Staging",
+    "object_type": "Table",
+    "inputs": [
+      "999_12",
+      "-2"
+    ],
+    "outputs": [
+      "999_17",
+      "999_18",
+      "999_26"
+    ],
+    "description": "Staged order data",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_9",
+    "name": "stg_Products",
+    "schema": "Staging",
+    "object_type": "Table",
+    "inputs": [
+      "999_13"
+    ],
+    "outputs": [
+      "999_99"
+    ],
+    "description": "Staged product data",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_10",
+    "name": "stg_OrderItems",
+    "schema": "Staging",
+    "object_type": "Table",
+    "inputs": [
+      "999_4"
+    ],
+    "outputs": [
+      "999_26"
+    ],
+    "description": "Staged order items",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_11",
+    "name": "sp_Load_Customers",
+    "schema": "Staging",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_1"
+    ],
+    "outputs": [
+      "999_7"
+    ],
+    "description": "Load customers to staging",
+    "ddl_text": "CREATE PROCEDURE [Staging].[sp_Load_Customers]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    TRUNCATE TABLE [Staging].[stg_Customers];\n\n    INSERT INTO [Staging].[stg_Customers]\n    SELECT CustomerID, CustomerName, Email, Phone, Region\n    FROM [Sales].[Customers]\n    WHERE IsActive = 1;\nEND"
+  },
+  {
+    "id": "999_12",
+    "name": "sp_Load_Orders",
+    "schema": "Staging",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_2",
+      "999_1"
+    ],
+    "outputs": [
+      "999_8"
+    ],
+    "description": "Load orders to staging",
+    "ddl_text": "CREATE PROCEDURE [Staging].[sp_Load_Orders]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    TRUNCATE TABLE [Staging].[stg_Orders];\n\n    INSERT INTO [Staging].[stg_Orders]\n    SELECT o.OrderID, o.CustomerID, o.OrderDate, o.TotalAmount\n    FROM [Sales].[Orders] o\n    INNER JOIN [Sales].[Customers] c ON o.CustomerID = c.CustomerID\n    WHERE o.OrderDate >= DATEADD(YEAR, -2, GETDATE());\nEND"
+  },
+  {
+    "id": "999_13",
+    "name": "sp_Load_Products",
+    "schema": "Staging",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_3"
+    ],
+    "outputs": [
+      "999_9"
+    ],
+    "description": "Load products to staging",
+    "ddl_text": "CREATE PROCEDURE [Staging].[sp_Load_Products]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    TRUNCATE TABLE [Staging].[stg_Products];\n\n    INSERT INTO [Staging].[stg_Products]\n    SELECT ProductID, ProductName, Category, Price, Cost\n    FROM [Sales].[Products];\nEND"
+  },
+  {
+    "id": "999_14",
+    "name": "trf_Customer_Enriched",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_17"
+    ],
+    "outputs": [
+      "999_25",
+      "999_95",
+      "999_98"
+    ],
+    "description": "Enriched customer data",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_15",
+    "name": "trf_Order_Metrics",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_18"
+    ],
+    "outputs": [],
+    "description": "Order aggregation metrics",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_17",
+    "name": "sp_Enrich_Customers",
+    "schema": "Transform",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_7",
+      "999_8",
+      "999_58"
+    ],
+    "outputs": [
+      "999_14"
+    ],
+    "description": "Enrich customer data with order metrics",
+    "ddl_text": "CREATE PROCEDURE [Transform].[sp_Enrich_Customers]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    TRUNCATE TABLE [Transform].[trf_Customer_Enriched];\n\n    INSERT INTO [Transform].[trf_Customer_Enriched]\n    SELECT\n        c.CustomerID, c.CustomerName, c.Region,\n        COUNT(o.OrderID) AS TotalOrders,\n        SUM(o.TotalAmount) AS LifetimeValue,\n        MAX(o.OrderDate) AS LastOrderDate\n    FROM [Staging].[stg_Customers] c\n    LEFT JOIN [Staging].[stg_Orders] o ON c.CustomerID = o.CustomerID\n    GROUP BY c.CustomerID, c.CustomerName, c.Region;\nEND"
+  },
+  {
+    "id": "999_18",
+    "name": "sp_Calculate_Order_Metrics",
+    "schema": "Transform",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_8"
+    ],
+    "outputs": [
+      "999_15"
+    ],
+    "description": "Calculate daily order metrics",
+    "ddl_text": "CREATE PROCEDURE [Transform].[sp_Calculate_Order_Metrics]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    TRUNCATE TABLE [Transform].[trf_Order_Metrics];\n\n    INSERT INTO [Transform].[trf_Order_Metrics]\n    SELECT\n        CAST(OrderDate AS DATE) AS OrderDate,\n        COUNT(*) AS OrderCount,\n        SUM(TotalAmount) AS Revenue,\n        AVG(TotalAmount) AS AvgOrderValue\n    FROM [Staging].[stg_Orders]\n    GROUP BY CAST(OrderDate AS DATE);\nEND"
+  },
+  {
+    "id": "999_19",
+    "name": "Dim_Customer",
+    "schema": "Sales",
+    "object_type": "Table",
+    "inputs": [
+      "999_25"
+    ],
+    "outputs": [
+      "999_26",
+      "999_27",
+      "999_28",
+      "999_61"
+    ],
+    "description": "Customer dimension table",
+    "data_model_type": "Dimension"
+  },
+  {
+    "id": "999_20",
+    "name": "Dim_Product",
+    "schema": "Sales",
+    "object_type": "Table",
+    "outputs": [
+      "999_26",
+      "999_27"
+    ],
+    "description": "Product dimension table",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_21",
+    "name": "Dim_Date",
+    "schema": "Sales",
+    "object_type": "Table",
+    "outputs": [
+      "999_26",
+      "999_27"
+    ],
+    "description": "Date dimension table",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_22",
+    "name": "Dim_Region",
+    "schema": "Sales",
+    "object_type": "Table",
+    "outputs": [
+      "999_26"
+    ],
+    "description": "Region dimension table",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_23",
+    "name": "Fact_Sales",
+    "schema": "Sales",
+    "object_type": "Table",
+    "inputs": [
+      "999_26",
+      "-4"
+    ],
+    "outputs": [
+      "999_27"
+    ],
+    "description": "Sales fact table",
+    "data_model_type": "Fact"
+  },
+  {
+    "id": "999_25",
+    "name": "sp_Load_Dim_Customer",
+    "schema": "Sales",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_14"
+    ],
+    "outputs": [
+      "999_19"
+    ],
+    "description": "Load customer dimension using SCD Type 1",
+    "ddl_text": "CREATE PROCEDURE [Analytics].[sp_Load_Dim_Customer]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    MERGE [Analytics].[Dim_Customer] AS target\n    USING [Transform].[trf_Customer_Enriched] AS source\n    ON target.CustomerID = source.CustomerID\n    WHEN MATCHED THEN\n        UPDATE SET CustomerName = source.CustomerName, Region = source.Region\n    WHEN NOT MATCHED THEN\n        INSERT (CustomerID, CustomerName, Region, TotalOrders, LifetimeValue)\n        VALUES (source.CustomerID, source.CustomerName, source.Region, source.TotalOrders, source.LifetimeValue);\nEND"
+  },
+  {
+    "id": "999_26",
+    "name": "sp_Load_Fact_Sales",
+    "schema": "Sales",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_8",
+      "999_10",
+      "999_19",
+      "999_20",
+      "999_21",
+      "999_22",
+      "-3",
+      "999_61",
+      "999_134"
+    ],
+    "outputs": [
+      "999_23"
+    ],
+    "description": "Load sales fact table",
+    "ddl_text": "CREATE PROCEDURE [Analytics].[sp_Load_Fact_Sales]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    INSERT INTO [Analytics].[Fact_Sales]\n    SELECT\n        o.OrderID, dc.CustomerKey, dp.ProductKey, dd.DateKey, dr.RegionKey,\n        oi.Quantity, oi.UnitPrice, oi.TotalAmount\n    FROM [Staging].[stg_Orders] o\n    INNER JOIN [Staging].[stg_OrderItems] oi ON o.OrderID = oi.OrderID\n    INNER JOIN [Analytics].[Dim_Customer] dc ON o.CustomerID = dc.CustomerID\n    INNER JOIN [Analytics].[Dim_Product] dp ON oi.ProductID = dp.ProductID\n    INNER JOIN [Analytics].[Dim_Date] dd ON CAST(o.OrderDate AS DATE) = dd.Date\n    INNER JOIN [Analytics].[Dim_Region] dr ON dc.Region = dr.RegionName\n    WHERE NOT EXISTS (SELECT 1 FROM [Analytics].[Fact_Sales] f WHERE f.OrderID = o.OrderID);\nEND"
+  },
+  {
+    "id": "999_27",
+    "name": "vw_Sales_Summary",
+    "schema": "Sales",
+    "object_type": "View",
+    "inputs": [
+      "999_23",
+      "999_19",
+      "999_20",
+      "999_21"
+    ],
+    "description": "Sales summary by customer and product",
+    "data_model_type": "Other",
+    "ddl_text": "CREATE VIEW [Analytics].[vw_Sales_Summary]\nAS\nSELECT\n    dc.CustomerName, dp.ProductName, dd.Year, dd.Month,\n    SUM(fs.TotalAmount) AS TotalSales,\n    COUNT(*) AS TransactionCount\nFROM [Analytics].[Fact_Sales] fs\nINNER JOIN [Analytics].[Dim_Customer] dc ON fs.CustomerKey = dc.CustomerKey\nINNER JOIN [Analytics].[Dim_Product] dp ON fs.ProductKey = dp.ProductKey\nINNER JOIN [Analytics].[Dim_Date] dd ON fs.DateKey = dd.DateKey\nGROUP BY dc.CustomerName, dp.ProductName, dd.Year, dd.Month",
+    "outputs": []
+  },
+  {
+    "id": "999_28",
+    "name": "vw_Top_Customers",
+    "schema": "Sales",
+    "object_type": "View",
+    "inputs": [
+      "999_19"
+    ],
+    "description": "Top 100 customers by lifetime value",
+    "data_model_type": "Other",
+    "ddl_text": "CREATE VIEW [Analytics].[vw_Top_Customers]\nAS\nSELECT TOP 100\n    dc.CustomerID, dc.CustomerName, dc.Region, dc.LifetimeValue,\n    RANK() OVER (ORDER BY dc.LifetimeValue DESC) AS CustomerRank\nFROM [Analytics].[Dim_Customer] dc\nWHERE dc.LifetimeValue > 0\nORDER BY dc.LifetimeValue DESC",
+    "outputs": []
+  },
+  {
+    "id": "999_38",
+    "name": "Budgets",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_39"
+    ],
+    "outputs": [
+      "999_39"
+    ],
+    "description": "Budget allocations",
+    "data_model_type": "Other",
+    "bidirectional_with": [
+      "999_39"
+    ]
+  },
+  {
+    "id": "999_39",
+    "name": "Actuals",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_38"
+    ],
+    "outputs": [
+      "999_38"
+    ],
+    "description": "Actual spending",
+    "data_model_type": "Other",
+    "bidirectional_with": [
+      "999_38"
+    ]
+  },
+  {
+    "id": "999_42",
+    "name": "Employees",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_48"
+    ],
+    "outputs": [
+      "999_48"
+    ],
+    "description": "Employee master data",
+    "data_model_type": "Dimension"
+  },
+  {
+    "id": "999_48",
+    "name": "sp_Build_Org_Hierarchy",
+    "schema": "Transform",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_42"
+    ],
+    "outputs": [
+      "999_42"
+    ],
+    "description": "Build organization hierarchy (recursive)",
+    "ddl_text": "CREATE PROCEDURE [HR].[sp_Build_Org_Hierarchy]\nAS\nBEGIN\n    SET NOCOUNT ON;\n\n    ;WITH OrgCTE AS (\n        SELECT EmployeeID, ManagerID, EmployeeName, 0 AS Level,\n               CAST(EmployeeName AS VARCHAR(MAX)) AS HierarchyPath\n        FROM [HR].[Employees]\n        WHERE ManagerID IS NULL\n\n        UNION ALL\n\n        SELECT e.EmployeeID, e.ManagerID, e.EmployeeName, cte.Level + 1,\n               CAST(cte.HierarchyPath + ' > ' + e.EmployeeName AS VARCHAR(MAX))\n        FROM [HR].[Employees] e\n        INNER JOIN OrgCTE cte ON e.ManagerID = cte.EmployeeID\n    )\n    SELECT * FROM OrgCTE;\nEND"
+  },
+  {
+    "id": "999_58",
+    "name": "fn_Calculate_Lead_Score",
+    "schema": "Staging",
+    "object_type": "Function",
+    "inputs": [],
+    "outputs": [
+      "999_17"
+    ],
+    "description": "Calculate lead score based on engagement",
+    "ddl_text": "CREATE FUNCTION [dbo].[fn_Calculate_Lead_Score](@LeadID INT)\nRETURNS INT\nAS\nBEGIN\n    DECLARE @Score INT = 0;\n\n    SELECT @Score =\n        CASE WHEN EmailOpens > 10 THEN 30 WHEN EmailOpens > 5 THEN 20 ELSE 10 END +\n        CASE WHEN WebsiteVisits > 20 THEN 40 WHEN WebsiteVisits > 10 THEN 25 ELSE 10 END +\n        CASE WHEN DemoRequested = 1 THEN 30 ELSE 0 END\n    FROM [Marketing].[Leads]\n    WHERE LeadID = @LeadID;\n\n    RETURN ISNULL(@Score, 0);\nEND"
+  },
+  {
+    "id": "999_61",
+    "name": "fn_Calculate_Discount",
+    "schema": "Staging",
+    "object_type": "Function",
+    "inputs": [
+      "999_19"
+    ],
+    "description": "Calculate customer discount percentage",
+    "ddl_text": "CREATE FUNCTION [dbo].[fn_Calculate_Discount](@CustomerID INT, @OrderAmount DECIMAL(18,2))\nRETURNS DECIMAL(5,2)\nAS\nBEGIN\n    DECLARE @Discount DECIMAL(5,2) = 0;\n\n    IF @OrderAmount > 1000 SET @Discount = @Discount + 5;\n    IF @OrderAmount > 5000 SET @Discount = @Discount + 5;\n\n    IF EXISTS (SELECT 1 FROM [Analytics].[Dim_Customer] WHERE CustomerID = @CustomerID AND TotalOrders > 10)\n        SET @Discount = @Discount + 3;\n\n    RETURN @Discount;\nEND",
+    "outputs": [
+      "999_26"
+    ]
+  },
+  {
+    "id": "999_63",
+    "name": "stg_Archive_2020",
+    "schema": "Legacy",
+    "object_type": "Table",
+    "description": "Archived staging data (unused)",
+    "data_model_type": "Other",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "999_64",
+    "name": "Dim_Currency_OLD",
+    "schema": "Legacy",
+    "object_type": "Table",
+    "description": "Deprecated currency dimension",
+    "data_model_type": "Dimension",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "999_65",
+    "name": "vw_Deprecated_Report",
+    "schema": "Legacy",
+    "object_type": "View",
+    "description": "Deprecated report view",
+    "data_model_type": "Other",
+    "ddl_text": "CREATE VIEW [Analytics].[vw_Deprecated_Report] AS SELECT 'Deprecated' AS Message",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "999_66",
+    "name": "sp_Legacy_Load",
+    "schema": "Legacy",
+    "object_type": "Stored Procedure",
+    "description": "Deprecated legacy procedure",
+    "ddl_text": "CREATE PROCEDURE [Staging].[sp_Legacy_Load] AS SELECT 'Deprecated' AS Status",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "999_68",
+    "name": "Dim_Channel",
+    "schema": "Web",
+    "object_type": "Table",
+    "outputs": [
+      "999_70"
+    ],
+    "description": "Sales channel dimension",
+    "data_model_type": "Dimension",
+    "inputs": []
+  },
+  {
+    "id": "999_70",
+    "name": "Fact_Web_Traffic",
+    "schema": "Web",
+    "object_type": "Table",
+    "inputs": [
+      "999_68",
+      "999_71",
+      "999_74",
+      "-5"
+    ],
+    "description": "Web traffic analytics",
+    "data_model_type": "Fact",
+    "outputs": []
+  },
+  {
+    "id": "999_71",
+    "name": "stg_Web_Events",
+    "schema": "Staging",
+    "object_type": "Table",
+    "outputs": [
+      "999_70",
+      "999_74"
+    ],
+    "description": "Staged web event data",
+    "data_model_type": "Other",
+    "inputs": [
+      "-1"
+    ]
+  },
+  {
+    "id": "999_74",
+    "name": "trf_Web_Sessionized",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_71"
+    ],
+    "outputs": [
+      "999_70"
+    ],
+    "description": "Sessionized web data",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_92",
+    "name": "trf_Return_Analysis",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_99"
+    ],
+    "outputs": [
+      "999_104"
+    ],
+    "description": "Return analysis metrics",
+    "data_model_type": "Other"
+  },
+  {
+    "id": "999_95",
+    "name": "trf_Customer_Segments",
+    "schema": "Transform",
+    "object_type": "Table",
+    "inputs": [
+      "999_14",
+      "999_98"
+    ],
+    "description": "Customer segmentation",
+    "data_model_type": "Other",
+    "outputs": []
+  },
+  {
+    "id": "999_98",
+    "name": "sp_Segment_Customers",
+    "schema": "Transform",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_14"
+    ],
+    "outputs": [
+      "999_95"
+    ],
+    "description": "Segment customers by value",
+    "ddl_text": "CREATE PROCEDURE [Transform].[sp_Segment_Customers]\nAS\nBEGIN\n    SET NOCOUNT ON;\n    TRUNCATE TABLE [Transform].[trf_Customer_Segments];\n    INSERT INTO [Transform].[trf_Customer_Segments]\n    SELECT\n        c.CustomerID,\n        CASE\n            WHEN c.LifetimeValue > 10000 THEN 'Platinum'\n            WHEN c.LifetimeValue > 5000 THEN 'Gold'\n            WHEN c.LifetimeValue > 1000 THEN 'Silver'\n            ELSE 'Bronze'\n        END AS Segment\n    FROM [Transform].[trf_Customer_Enriched] c;\nEND"
+  },
+  {
+    "id": "999_99",
+    "name": "sp_Analyze_Returns",
+    "schema": "Transform",
+    "object_type": "Stored Procedure",
+    "inputs": [
+      "999_9"
+    ],
+    "outputs": [
+      "999_92"
+    ],
+    "description": "Analyze product returns",
+    "ddl_text": "CREATE PROCEDURE [Transform].[sp_Analyze_Returns]\nAS\nBEGIN\n    SET NOCOUNT ON;\n    INSERT INTO [Transform].[trf_Return_Analysis]\n    SELECT\n        p.ProductID, p.ProductName,\n        COUNT(*) AS ReturnCount,\n        AVG(r.Quantity) AS AvgReturnQty\n    FROM [Staging].[stg_Returns] r\n    INNER JOIN [Staging].[stg_Products] p ON r.ProductID = p.ProductID\n    GROUP BY p.ProductID, p.ProductName;\nEND"
+  },
+  {
+    "id": "999_104",
+    "name": "Fact_Returns",
+    "schema": "Sales",
+    "object_type": "Table",
+    "inputs": [
+      "999_92"
+    ],
+    "outputs": [],
+    "description": "Returns fact table",
+    "data_model_type": "Fact"
+  },
+  {
+    "id": "999_134",
+    "name": "fn_Calculate_Margin",
+    "schema": "Staging",
+    "object_type": "Function",
+    "description": "Calculate profit margin",
+    "ddl_text": "CREATE FUNCTION [dbo].[fn_Calculate_Margin](@Price DECIMAL(18,2), @Cost DECIMAL(18,2))\nRETURNS DECIMAL(5,2)\nAS\nBEGIN\n    IF @Price = 0 RETURN 0;\n    RETURN ((@Price - @Cost) / @Price) * 100;\nEND",
+    "inputs": [],
+    "outputs": [
+      "999_26"
+    ]
+  },
+  {
+    "id": "-1",
+    "name": "web_events.parquet",
+    "schema": "",
+    "object_type": "External",
+    "is_external": true,
+    "external_ref_type": "FILE",
+    "ref_name": "https://contosodatalake.blob.core.windows.net/analytics/events/2024/web_events.parquet",
+    "description": "External Azure Blob - web clickstream events",
+    "inputs": [],
+    "outputs": [
+      "999_71"
+    ]
+  },
+  {
+    "id": "-2",
+    "name": "email_clicks.csv",
+    "schema": "",
+    "object_type": "External",
+    "is_external": true,
+    "external_ref_type": "FILE",
+    "ref_name": "https://marketingdata.blob.core.windows.net/campaigns/email_clicks_2024.csv",
+    "description": "External Azure Blob - email campaign click data",
+    "inputs": [],
+    "outputs": [
+      "999_8"
+    ]
+  },
+  {
+    "id": "-3",
+    "name": "SourceDB.staging.HistoricalOrders",
+    "schema": "",
+    "object_type": "External",
+    "is_external": true,
+    "external_ref_type": "OTHER_DB",
+    "ref_name": "SourceDB.staging.HistoricalOrders",
+    "description": "Cross-database reference - historical orders from source warehouse",
+    "inputs": [],
+    "outputs": [
+      "999_26"
+    ]
+  },
+  {
+    "id": "-4",
+    "name": "FinanceHub.dbo.CurrencyRates",
+    "schema": "",
+    "object_type": "External",
+    "is_external": true,
+    "external_ref_type": "OTHER_DB",
+    "ref_name": "FinanceHub.dbo.CurrencyRates",
+    "description": "Cross-database reference - currency exchange rates",
+    "inputs": [],
+    "outputs": [
+      "999_23"
+    ]
+  },
+  {
+    "id": "-5",
+    "name": "partner_events/*.parquet",
+    "schema": "",
+    "object_type": "External",
+    "is_external": true,
+    "external_ref_type": "LINK",
+    "ref_name": "https://onelake.dfs.fabric.microsoft.com/contoso-workspace/partnerlakehouse/Files/partner_events/*.parquet",
+    "description": "OneLake shortcut - partner event data from external lakehouse",
+    "inputs": [],
+    "outputs": [
+      "999_70"
+    ]
+  }
+]

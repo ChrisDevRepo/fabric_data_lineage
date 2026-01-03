@@ -1,0 +1,13 @@
+{
+    "Workload_Display_Name": "Data Lineage",
+    "Workload_Full_Display_Name": "Data Lineage Visualizer",
+    "Workload_Description": "Object-level lineage visualization for Microsoft Fabric Data Warehouses",
+    "Workload_Hub_Slogan": "Object Dependency Visualization for Fabric DWH",
+    "Workload_Hub_Description": "Visualize how data flows through your Fabric Data Warehouse. Explore object dependencies with an interactive graph that shows connections between tables, views, stored procedures, and functions.\n\nTrace upstream and downstream dependencies with a single click. Search DDL definitions across your entire warehouse. Filter by schema or object type. Export graphs to PNG for documentation.\n\nYour data stays secure. This workload reads only metadata through Fabric's GraphQL API using your existing credentials. No table data is accessed.",
+    "Workload_Hub_GetStarted_1_Title": "Getting Started",
+    "Workload_Hub_GetStarted_1_Sub_Title": "Set up lineage visualization in your workspace",
+    "Workload_Hub_GetStarted_1_Description": "Create a Fabric SQL Database, run the schema DDL, extract metadata from your DWH, and configure the GraphQL endpoint in Settings.",
+    "DataLineageItem_DisplayName": "Data Lineage",
+    "DataLineageItem_DisplayName_Plural": "Data Lineages",
+    "DataLineageItem_Description": "Object-level dependency visualization for tables, views, stored procedures, and functions"
+}

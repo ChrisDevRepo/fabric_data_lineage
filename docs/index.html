@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fabric Data Lineage - Object Dependency Visualization for Microsoft Fabric</title>
+    <meta name="description" content="Open source Microsoft Fabric workload for visualizing object-level data lineage across Fabric Data Warehouses. Built with the Fabric Extensibility Toolkit.">
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fabric-primary: #0078D4;
+            --fabric-secondary: #106EBE;
+            --fabric-dark: #004578;
+            --fabric-accent: #0099BC;
+            --fabric-background: #FAF9F8;
+            --fabric-surface: #FFFFFF;
+            --fabric-text: #323130;
+            --fabric-text-secondary: #605E5C;
+            --fabric-border: #EDEBE9;
+            --fabric-success: #107C10;
+            --fabric-warning: #FFB900;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--fabric-text);
+            background: var(--fabric-background);
+        }
+
+        /* Header Navigation */
+        header {
+            background: #FAFAFB;
+            border-bottom: 1px solid var(--fabric-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--fabric-text);
+        }
+
+        .logo-img {
+            height: 40px;
+            width: auto;
+            border-radius: 6px;
+            object-fit: contain;
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 1.35rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--fabric-text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--fabric-primary);
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--fabric-text);
+            color: white !important;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .github-link:hover {
+            background: #24292e;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, var(--fabric-surface) 0%, #F3F2F1 100%);
+            padding: 4rem 2rem 3rem;
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero-eyebrow {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--fabric-text-secondary);
+            margin-bottom: 1rem;
+            letter-spacing: 0.02em;
+        }
+
+        .hero h1 {
+            font-size: 2.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--fabric-text);
+        }
+
+        .hero-platform {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--fabric-text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .hero-platform span {
+            background: linear-gradient(135deg, var(--fabric-primary), var(--fabric-accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--fabric-text-secondary);
+            margin-bottom: 2rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 140px;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid var(--fabric-border);
+            background: var(--fabric-surface);
+            color: var(--fabric-text);
+        }
+
+        .btn:hover {
+            border-color: var(--fabric-text);
+        }
+
+        .btn-primary {
+            background: var(--fabric-primary);
+            border-color: var(--fabric-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--fabric-secondary);
+            border-color: var(--fabric-secondary);
+        }
+
+        /* Hero Screenshot */
+        .hero-screenshot {
+            max-width: 1000px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            background: #1e1e1e;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .hero-screenshot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Problem Section */
+        .problem-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-surface);
+        }
+
+        .section-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-header h2 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-header p {
+            color: var(--fabric-text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .problem-card {
+            background: var(--fabric-background);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--fabric-border);
+        }
+
+        .problem-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .problem-card p {
+            color: var(--fabric-text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-background);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--fabric-surface);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--fabric-border);
+            transition: box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 120, 212, 0.1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--fabric-primary);
+        }
+
+        .feature-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--fabric-text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Demo Section */
+        .demo-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-surface);
+        }
+
+        .demo-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .demo-video {
+            position: relative;
+            padding-bottom: 56.25%;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .demo-video iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Scope Section */
+        .scope-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-background);
+        }
+
+        .scope-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .scope-card {
+            background: var(--fabric-surface);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--fabric-border);
+        }
+
+        .scope-card h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--fabric-primary);
+        }
+
+        .scope-card.limitations h3 {
+            color: var(--fabric-text-secondary);
+        }
+
+        .scope-list {
+            list-style: none;
+        }
+
+        .scope-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .scope-list .check {
+            color: var(--fabric-success);
+            font-weight: bold;
+        }
+
+        /* Architecture Section */
+        .architecture-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-surface);
+        }
+
+        .architecture-steps {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .arch-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            max-width: 300px;
+        }
+
+        .arch-step-num {
+            background: var(--fabric-primary);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .arch-step-content strong {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .arch-step-content span {
+            color: var(--fabric-text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .architecture-diagram-placeholder {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .architecture-diagram-placeholder img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        /* Getting Started Section */
+        .getting-started-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-background);
+        }
+
+        .quickstart-box {
+            background: var(--fabric-surface);
+            border: 1px solid var(--fabric-border);
+            border-radius: 12px;
+            padding: 2.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .quickstart-box h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quickstart-box p {
+            color: var(--fabric-text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 1.05rem;
+        }
+
+        .quickstart-steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin: 2rem 0;
+            text-align: left;
+        }
+
+        .quickstart-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .step-num {
+            background: var(--fabric-primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            font-size: 0.95rem;
+        }
+
+        .step-text strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-text span {
+            color: var(--fabric-text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Creator Section */
+        .creator-section {
+            padding: 4rem 2rem;
+            background: var(--fabric-surface);
+        }
+
+        .creator-content {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .creator-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--fabric-primary), var(--fabric-accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5rem;
+            font-weight: 600;
+        }
+
+        .creator-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .creator-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .creator-content .title {
+            color: var(--fabric-text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .creator-content .bio {
+            color: var(--fabric-text-secondary);
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.7;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .social-links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--fabric-text);
+            text-decoration: none;
+            padding: 0.6rem 1.25rem;
+            border: 1px solid var(--fabric-border);
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .social-links a:hover {
+            color: var(--fabric-primary);
+            border-color: var(--fabric-primary);
+        }
+
+        .social-links .linkedin:hover {
+            color: #0A66C2;
+            border-color: #0A66C2;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--fabric-text);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        footer a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: white;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-copyright {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .quickstart-steps {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav>
+            <a href="#" class="logo">
+                <img src="images/logo.png" alt="Fabric Data Lineage" class="logo-img">
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#demo">Demo</a></li>
+                <li><a href="#scope">Scope</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="https://github.com/ChrisDevRepo/fabric_data_lineage" target="_blank" class="github-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <p class="hero-eyebrow">Open Source · Built for Microsoft Fabric</p>
+            <h1>Visualize Data Dependencies</h1>
+            <p class="hero-platform">in <span>Fabric Warehouses</span></p>
+            <p class="hero-subtitle">
+                Trace how data flows through stored procedures, views, and functions. Understand object dependencies at a glance. Built natively for Microsoft Fabric.
+            </p>
+            <div class="hero-buttons">
+                <a href="https://github.com/ChrisDevRepo/fabric_data_lineage" target="_blank" class="btn btn-primary">View on GitHub</a>
+                <a href="#demo" class="btn">Watch Demo</a>
+                <a href="QUICKSTART.md" class="btn">Quick Start</a>
+            </div>
+            <!-- Product screenshot - Fabric's native lineage -->
+            <div class="hero-screenshot">
+                <img src="images/Product-Page.png" alt="Fabric native lineage - item-level view">
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem-section">
+        <div class="section-content">
+            <div class="section-header">
+                <h2>The Problem</h2>
+                <p>Data warehouses grow complex. Dependencies hide in SQL code. Impact analysis becomes guesswork.</p>
+            </div>
+            <div class="problem-grid">
+                <div class="problem-card">
+                    <h3>Hidden Dependencies</h3>
+                    <p>Stored procedures call other procedures. Views reference tables across schemas. The full picture is scattered across hundreds of objects.</p>
+                </div>
+                <div class="problem-card">
+                    <h3>Risky Changes</h3>
+                    <p>Renaming a table? Modifying a view? You need to know every SP, report, and downstream process that depends on it.</p>
+                </div>
+                <div class="problem-card">
+                    <h3>Slow Onboarding</h3>
+                    <p>New team members spend weeks understanding data flow. Documentation is outdated. Tribal knowledge is the only guide.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Section -->
+    <section class="solution-section" style="padding: 4rem 2rem; background: var(--fabric-background);">
+        <div class="section-content" style="max-width: 1000px; margin: 0 auto;">
+            <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
+                <h2>The Solution</h2>
+                <p>Interactive object-level lineage visualization</p>
+            </div>
+            <div class="hero-screenshot">
+                <img src="images/data-lineage-gui.png" alt="Fabric Data Lineage - Interactive dependency graph visualization">
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="section-content">
+            <div class="section-header">
+                <h2>Features</h2>
+                <p>Interactive visualization for understanding object-level data lineage</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5z"/></svg>
+                    </div>
+                    <h3>Interactive Graph</h3>
+                    <p>Pan, zoom, and explore. Nodes color-coded by schema. Click any object to highlight its connections. Supports hundreds of objects.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                    </div>
+                    <h3>Trace Mode</h3>
+                    <p>Right-click any object to trace upstream sources or downstream consumers. Configurable depth from 1 to unlimited levels.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    </div>
+                    <h3>Code Search</h3>
+                    <p>Full-text search across all object definitions. Find references to specific tables, columns, or patterns. View SQL code with syntax highlighting.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                    </div>
+                    <h3>Smart Filtering</h3>
+                    <p>Filter by schema, object type, or data model classification. Focus on a single schema with automatic neighbor inclusion. Hide isolated nodes.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+                    </div>
+                    <h3>Multi-Warehouse</h3>
+                    <p>Connect multiple Fabric Data Warehouses. Switch between sources with a dropdown. External references (other DBs, Azure Storage) are tracked.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    </div>
+                    <h3>Export</h3>
+                    <p>Export the current view as PNG. Perfect for documentation, architecture reviews, or sharing with stakeholders.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo-section">
+        <div class="demo-container">
+            <div class="section-header">
+                <h2>See It in Action</h2>
+                <p>A 2-minute walkthrough of the main features</p>
+            </div>
+            <div class="demo-video">
+                <iframe
+                    src="https://www.youtube.com/embed/uZAk9PqHwJc"
+                    title="Fabric Data Lineage Demo"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scope Section -->
+    <section id="scope" class="scope-section">
+        <div class="section-content">
+            <div class="section-header">
+                <h2>What's Included</h2>
+                <p>Clear scope and honest limitations</p>
+            </div>
+            <div class="scope-grid">
+                <div class="scope-card">
+                    <h3>Supported</h3>
+                    <ul class="scope-list">
+                        <li><span class="check">&#10003;</span> Tables, Views, SPs, Functions</li>
+                        <li><span class="check">&#10003;</span> Multiple warehouses</li>
+                        <li><span class="check">&#10003;</span> External references (cross-database, Storage, OneLake)</li>
+                        <li><span class="check">&#10003;</span> Metadata only, no table data</li>
+                        <li><span class="check">&#10003;</span> Stays in your tenant</li>
+                    </ul>
+                </div>
+                <div class="scope-card limitations">
+                    <h3>Current Scope</h3>
+                    <ul class="scope-list">
+                        <li>Object-level lineage (column-level not included)</li>
+                        <li>Fabric Data Warehouse only</li>
+                        <li>Dynamic SQL via hardcoded hints</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture" class="architecture-section">
+        <div class="section-content">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>Three steps, all within your Fabric workspace</p>
+            </div>
+            <div class="architecture-steps">
+                <div class="arch-step">
+                    <div class="arch-step-num">1</div>
+                    <div class="arch-step-content">
+                        <strong>Connect</strong>
+                        <span>Point to your Fabric Data Warehouse — only metadata is read, never your actual data</span>
+                    </div>
+                </div>
+                <div class="arch-step">
+                    <div class="arch-step-num">2</div>
+                    <div class="arch-step-content">
+                        <strong>Discover</strong>
+                        <span>Dependencies are automatically detected from your SQL definitions</span>
+                    </div>
+                </div>
+                <div class="arch-step">
+                    <div class="arch-step-num">3</div>
+                    <div class="arch-step-content">
+                        <strong>Explore</strong>
+                        <span>Visualize and trace data flow — everything stays secure in your tenant</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Architecture diagram placeholder - replace with visual -->
+            <div class="architecture-diagram-placeholder">
+                <img src="images/architecture.png" alt="Architecture diagram" onerror="this.parentElement.style.display='none'">
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting Started Section -->
+    <section id="getting-started" class="getting-started-section">
+        <div class="section-content">
+            <div class="quickstart-box">
+                <h3>Ready to try it?</h3>
+                <p>Get started in minutes with the setup guide</p>
+                <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
+                    <a href="QUICKSTART.md" class="btn btn-primary">Setup Guide</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About / Creator Section -->
+    <section id="about" class="creator-section">
+        <div class="creator-content">
+            <div class="creator-avatar">
+                <img src="https://github.com/ChrisDevRepo.png" alt="Christian Wagner">
+            </div>
+            <h3>Christian Wagner</h3>
+            <p class="title">Data Architect & Engineer</p>
+            <p class="bio">
+                Building tools to make data engineering workflows more transparent and efficient.
+                Focused on the Microsoft data stack, cloud architecture, and developer experience.
+            </p>
+            <div class="social-links">
+                <a href="https://at.linkedin.com/in/christian-wagner-11aa8614b" target="_blank" class="linkedin">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                    LinkedIn
+                </a>
+                <a href="https://github.com/ChrisDevRepo" target="_blank">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-links">
+            <a href="QUICKSTART.md">Quick Start</a>
+            <a href="FEATURES.md">Features</a>
+        </div>
+        <p class="footer-copyright">
+            MIT License &copy; 2025 Christian Wagner
+        </p>
+    </footer>
+</body>
+</html>
