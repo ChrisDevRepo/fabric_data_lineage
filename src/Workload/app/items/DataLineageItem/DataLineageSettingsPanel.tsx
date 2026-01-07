@@ -308,6 +308,13 @@ export function DataLineageSettingsPanel({ workloadClient }: PageProps) {
 
           setItem(loadedItem);
           setDefinition(merged);
+
+          // Warm-up: Fire-and-forget query to wake up SQL database
+          if (!merged.useSampleData && merged.graphqlEndpoint) {
+            createLineageService(workloadClient, merged.graphqlEndpoint)
+              .getSources()
+              .catch(() => {});
+          }
         } catch (error) {
           console.error('Failed to load item for settings:', error);
           setDefinition(DEFAULT_DEFINITION);

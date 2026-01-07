@@ -16,7 +16,7 @@
 import { DataNode } from './types';
 
 const CACHE_PREFIX = 'datalineage_cache_';
-const DEFAULT_TTL_MINUTES = 60 * 24; // 24 hours
+const DEFAULT_TTL_MINUTES = 60 * 24 * 7; // 7 days
 
 export interface CachedLineageData {
   data: DataNode[];

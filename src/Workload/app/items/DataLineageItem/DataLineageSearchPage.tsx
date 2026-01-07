@@ -95,6 +95,9 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
         // Create service with endpoint from item definition
         serviceRef.current = createLineageService(workloadClient, graphqlEndpoint);
 
+        // Warm-up: Fire-and-forget query to wake up SQL database
+        serviceRef.current.getSources().catch(() => {});
+
         // Load schemas for filter dropdown
         const objects = await serviceRef.current.getObjects();
         const schemas = [...new Set(objects.map((o) => o.schema_name))].sort();

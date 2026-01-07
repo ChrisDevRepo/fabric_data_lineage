@@ -87,7 +87,7 @@
 
     "Settings_DataSource": "Data Source",
     "Settings_DemoMode": "Demo Mode",
-    "Settings_DemoModeHint": "Use pre-generated sample data (138 objects) for demonstration without database connection",
+    "Settings_DemoModeHint": "Use pre-generated sample data for demonstration without database connection",
     "Settings_GraphQL": "GraphQL Connection",
     "Settings_GraphQLEndpoint": "GraphQL API Endpoint URL",
     "Settings_GraphQLDisabledHint": "Disabled in Demo Mode - turn off Demo Mode to use GraphQL",
