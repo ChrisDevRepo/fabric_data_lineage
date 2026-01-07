@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
+## [1.4.0] - 2026-01-07
+
+### Performance
+- Extended cache TTL from 24 hours to 7 days for faster repeat visits
+- Added warm-up queries on app load to reduce cold-start delays
+
+### Changed
+- Removed unused MS boilerplate code (~4K LOC)
+
 ## [1.3.1] - 2026-01-03
 
 ### Fixed
