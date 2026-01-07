@@ -10,6 +10,7 @@ CLAUDE.md
 .mcp.json
 src/docs/
 tools/
+CR*.md
 
 # Build
 build/

@@ -6,27 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [1.4.0] - 2026-01-07
-
-### Performance
-- Extended cache TTL from 24 hours to 7 days for faster repeat visits
-- Added warm-up queries on app load to reduce cold-start delays
-
-### Changed
-- Removed unused MS boilerplate code (~4K LOC)
+- Performance improvements: extended cache TTL, added warm-up queries
 
 ## [1.3.1] - 2026-01-03
-
-### Fixed
-- Infinite loop when GraphQL API fails (caused 429 rate limiting)
-- Infinite loop when API returns empty data
-- Retry counter showing multiple parallel counters
-- Notebook now fails pipeline with descriptive error when no data found
-
-### Changed
-- Reduced max retry attempts from 5 to 3
-- Single retry loop around parallel API calls (cleaner progress display)
-- Better error messages with HTTP status and endpoint URL
-- Notebook uses `mssparkutils.notebook.exit()` for pipeline-visible errors
+- Hotfix: infinite retry loop when GraphQL API fails
+- Improved error handling in notebook pipeline
 
 ### Added
 - "No data found" message when database is empty (with troubleshooting hints)
