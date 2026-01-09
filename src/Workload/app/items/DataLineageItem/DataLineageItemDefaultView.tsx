@@ -60,6 +60,7 @@ import { TraceControls, TraceActiveBanner } from './TraceControls';
 import { NodeContextMenu } from './NodeContextMenu';
 import { DDLViewerPanel, DDLViewerNode } from './DDLViewerPanel';
 import { exportGraphToImage } from './exportUtils';
+import { LineageService } from './LineageService';
 import {
   DataModelTypeRule,
   DataModelIcon,
@@ -76,11 +77,11 @@ interface ContextMenuState {
   x: number;
   y: number;
   nodeId: string;
+  objectId: number;
   nodeName: string;
   schemaName: string;
   objectType: string;
   hasSql: boolean;
-  ddlText: string | null;
 }
 
 // Custom node types
@@ -97,6 +98,10 @@ export interface DataLineageItemDefaultViewProps {
   excludedCount?: number;
   /** Whether demo mode is active (using sample data) */
   isDemo?: boolean;
+  /** LineageService instance for on-demand DDL loading */
+  service?: LineageService | null;
+  /** Current source ID for on-demand DDL loading */
+  sourceId?: number;
   onNodeClick?: (node: DataNode) => void;
   onControlsReady?: (controls: GraphControls) => void;
   /** Initial preferences from saved definition */
@@ -448,6 +453,8 @@ function DataLineageGraphInner({
   totalCount,
   excludedCount = 0,
   isDemo = false,
+  service,
+  sourceId,
   onNodeClick,
   onControlsReady,
   initialPreferences,
@@ -618,15 +625,21 @@ function DataLineageGraphInner({
       // External nodes don't support context menu
       if (dataNode.is_external) return;
 
+      // DDL is available for Views, Stored Procedures, Functions (not Tables)
+      const hasDdlType = ['View', 'Stored Procedure', 'Function'].includes(dataNode.object_type);
+
+      // Parse object_id from composite id string (format: {source_id}_{object_id})
+      const objectId = parseInt(dataNode.id.split('_')[1], 10);
+
       setContextMenu({
         x: event.clientX,
         y: event.clientY,
         nodeId: node.id,
+        objectId,
         nodeName: dataNode.name,
         schemaName: dataNode.schema,
         objectType: dataNode.object_type,
-        hasSql: !!dataNode.ddl_text,
-        ddlText: dataNode.ddl_text || null,
+        hasSql: hasDdlType,
       });
     },
     [displayNodes]
@@ -637,10 +650,10 @@ function DataLineageGraphInner({
     if (contextMenu) {
       setDdlViewerNode({
         id: contextMenu.nodeId,
+        objectId: contextMenu.objectId,
         name: contextMenu.nodeName,
         schema: contextMenu.schemaName,
         objectType: contextMenu.objectType,
-        ddlText: contextMenu.ddlText,
       });
       setContextMenu(null);
     }
@@ -917,6 +930,8 @@ function DataLineageGraphInner({
           node={ddlViewerNode}
           isOpen={ddlViewerNode !== null}
           onClose={() => setDdlViewerNode(null)}
+          service={service || null}
+          sourceId={sourceId}
         />
       </div>
     </div>

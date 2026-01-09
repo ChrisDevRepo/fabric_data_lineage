@@ -308,6 +308,13 @@ export function DataLineageSettingsPanel({ workloadClient }: PageProps) {
 
           setItem(loadedItem);
           setDefinition(merged);
+
+          // Warm-up: Fire-and-forget query to wake up SQL database
+          if (!merged.useSampleData && merged.graphqlEndpoint) {
+            createLineageService(workloadClient, merged.graphqlEndpoint)
+              .getSources()
+              .catch(() => {});
+          }
         } catch (error) {
           console.error('Failed to load item for settings:', error);
           setDefinition(DEFAULT_DEFINITION);
@@ -917,14 +924,6 @@ export function DataLineageSettingsPanel({ workloadClient }: PageProps) {
     </>
   );
 
-  if (isLoading) {
-    return (
-      <div className={styles.container} style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <Spinner size="large" label={t('Loading')} />
-      </div>
-    );
-  }
-
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -964,11 +963,19 @@ export function DataLineageSettingsPanel({ workloadClient }: PageProps) {
         </Tab>
       </TabList>
 
-      {/* Content */}
+      {/* Content - show spinner while loading, then tab content */}
       <div className={styles.content}>
-        {selectedTab === 'connection' && renderConnectionTab()}
-        {selectedTab === 'dataModel' && renderDataModelTab()}
-        {selectedTab === 'preferences' && renderPreferencesTab()}
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <Spinner size="medium" label={t('Loading')} />
+          </div>
+        ) : (
+          <>
+            {selectedTab === 'connection' && renderConnectionTab()}
+            {selectedTab === 'dataModel' && renderDataModelTab()}
+            {selectedTab === 'preferences' && renderPreferencesTab()}
+          </>
+        )}
       </div>
 
       {/* Footer */}

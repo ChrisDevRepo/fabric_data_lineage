@@ -10,6 +10,7 @@ CLAUDE.md
 .mcp.json
 src/docs/
 tools/
+CR*.md
 
 # Build
 build/
@@ -27,6 +28,7 @@ package-lock.json
 
 # OS
 .DS_Store
+nul
 Thumbs.db
 
 # Logs

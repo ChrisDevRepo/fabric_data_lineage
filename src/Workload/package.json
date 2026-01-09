@@ -1,6 +1,6 @@
 {
   "name": "fabric-developer-sample",
-  "version": "2.0.0",
+  "version": "1.4.0",
   "description": "Microsoft Fabric - Developer Sample App",
   "scripts": {
     "start": "npm run start:devServer",

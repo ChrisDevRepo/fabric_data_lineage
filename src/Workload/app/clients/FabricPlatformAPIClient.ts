@@ -1,19 +1,4 @@
 import { WorkloadClientAPI } from "@ms-fabric/workload-client";
-import { WorkspaceClient } from "./WorkspaceClient";
-import { ItemClient } from "./ItemClient";
-import { FolderClient } from "./FolderClient";
-import { CapacityClient } from "./CapacityClient";
-import { ConnectionClient } from "./ConnectionClient";
-import { JobSchedulerClient } from "./JobSchedulerClient";
-import { OneLakeShortcutClient } from "./OneLakeShortcutClient";
-import { LongRunningOperationsClient } from "./LongRunningOperationsClient";
-import { SparkLivyClient } from "./SparkLivyClient";
-import { SparkClient } from "./SparkClient";
-import { OneLakeStorageClient } from "./OneLakeStorageClient";
-import { ExternalDataSharesProviderClient } from "./ExternalDataSharesProviderClient";
-import { ExternalDataSharesRecipientClient } from "./ExternalDataSharesRecipientClient";
-import { TagsClient } from "./TagsClient";
-import { OneLakeDataAccessSecurityClient } from "./OneLakeDataAccessSecurityClient";
 
 /**
  * Comprehensive Fabric Platform API Client
@@ -23,38 +8,9 @@ import { OneLakeDataAccessSecurityClient } from "./OneLakeDataAccessSecurityClie
  * Service principal authentication is NOT supported in the Fabric iframe SDK.
  */
 export class FabricPlatformAPIClient {
-  public readonly workspaces: WorkspaceClient;
-  public readonly items: ItemClient;
-  public readonly folders: FolderClient;
-  public readonly capacities: CapacityClient;
-  public readonly connections: ConnectionClient;
-  public readonly scheduler: JobSchedulerClient;
-  public readonly shortcuts: OneLakeShortcutClient;
-  public readonly operations: LongRunningOperationsClient;
-  public readonly sparkLivy: SparkLivyClient;
-  public readonly spark: SparkClient;
-  public readonly oneLakeStorage: OneLakeStorageClient;
-  public readonly externalDataShares: ExternalDataSharesProviderClient;
-  public readonly externalDataSharesRecipient: ExternalDataSharesRecipientClient;
-  public readonly tags: TagsClient;
-  public readonly oneLakeDataAccessSecurity: OneLakeDataAccessSecurityClient;
-
   constructor(workloadClient: WorkloadClientAPI) {
-    this.workspaces = new WorkspaceClient(workloadClient);
-    this.items = new ItemClient(workloadClient);
-    this.folders = new FolderClient(workloadClient);
-    this.capacities = new CapacityClient(workloadClient);
-    this.connections = new ConnectionClient(workloadClient);
-    this.scheduler = new JobSchedulerClient(workloadClient);
-    this.shortcuts = new OneLakeShortcutClient(workloadClient);
-    this.operations = new LongRunningOperationsClient(workloadClient);
-    this.spark = new SparkClient(workloadClient);
-    this.sparkLivy = new SparkLivyClient(workloadClient);
-    this.oneLakeStorage = new OneLakeStorageClient(workloadClient);
-    this.externalDataShares = new ExternalDataSharesProviderClient(workloadClient);
-    this.externalDataSharesRecipient = new ExternalDataSharesRecipientClient(workloadClient);
-    this.tags = new TagsClient(workloadClient);
-    this.oneLakeDataAccessSecurity = new OneLakeDataAccessSecurityClient(workloadClient);
+    // All individual clients have been removed
+    // This class is kept for backward compatibility but has no active clients
   }
 
   /**

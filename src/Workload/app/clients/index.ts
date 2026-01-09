@@ -4,18 +4,8 @@ export { FabricPlatformAPIClient } from './FabricPlatformAPIClient';
 export { FabricAuthenticationService } from './FabricAuthenticationService';
 export * from './FabricPlatformTypes';
 
-// API Controllers
-export { WorkspaceClient as WorkspaceController } from './WorkspaceClient';
-export { ItemClient as ItemController } from './ItemClient';
-export { FolderClient } from './FolderClient';
-export { CapacityClient } from './CapacityClient';
-export { JobSchedulerClient } from './JobSchedulerClient';
-export { OneLakeShortcutClient } from './OneLakeShortcutClient';
-export { LongRunningOperationsClient } from './LongRunningOperationsClient';
-export { SparkLivyClient } from './SparkLivyClient';
-export { ExternalDataSharesProviderClient } from './ExternalDataSharesProviderClient';
-export { ExternalDataSharesRecipientClient } from './ExternalDataSharesRecipientClient';
-export { GatewayClient } from './GatewayClient';
+// Note: All specific API client controllers have been removed
+// Data Lineage app only uses FabricAuthenticationService for GraphQL authentication
 
 // Re-export WorkloadClientAPI for convenience
 export { WorkloadClientAPI } from '@ms-fabric/workload-client';

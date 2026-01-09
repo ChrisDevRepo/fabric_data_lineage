@@ -8,10 +8,16 @@ import { createWorkloadClient, InitParams, ItemTabActionContext } from '@ms-fabr
 import { fabricLightTheme } from "./theme";
 import { App } from "./App";
 import { callGetItem } from "./controller/ItemCRUDController"
+import { createLineageService, DEFAULT_GRAPHQL_ENDPOINT } from "./items/DataLineageItem/LineageService";
 
 export async function initialize(params: InitParams) {
     const workloadClient = createWorkloadClient();
     const history = createBrowserHistory();
+
+    // Warm-up: Fire-and-forget query to wake up SQL database early
+    createLineageService(workloadClient, DEFAULT_GRAPHQL_ENDPOINT)
+        .getSources()
+        .catch(() => {}); // Silent failure - warm-up served its purpose
 
     workloadClient.navigation.onNavigate((route) => {
         history.replace(route.targetUrl);

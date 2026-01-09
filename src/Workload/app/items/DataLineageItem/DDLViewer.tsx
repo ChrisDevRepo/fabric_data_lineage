@@ -15,11 +15,12 @@
 
 import React, { useRef, useCallback } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { Spinner, Text, tokens } from '@fluentui/react-components';
+import { Button, Spinner, Text, tokens } from '@fluentui/react-components';
 import {
   Code24Regular,
   Table24Regular,
   DocumentError24Regular,
+  ArrowClockwise24Regular,
 } from '@fluentui/react-icons';
 import { MONACO_EDITOR_OPTIONS } from './monacoConfig';
 
@@ -36,6 +37,8 @@ export interface DDLViewerProps {
   isLoading?: boolean;
   /** Error message if DDL failed to load */
   error?: string | null;
+  /** Callback for retry button (shown on error) */
+  onRetry?: () => void;
   /** Height of the editor (default: 100%) */
   height?: string | number;
   /** Show header with object info */
@@ -49,6 +52,7 @@ export function DDLViewer({
   schemaName,
   isLoading = false,
   error = null,
+  onRetry,
   height = '100%',
   showHeader = true,
 }: DDLViewerProps) {
@@ -119,10 +123,21 @@ export function DDLViewer({
           style={{
             color: tokens.colorNeutralForeground3,
             marginTop: tokens.spacingVerticalS,
+            textAlign: 'center',
           }}
         >
           {error}
         </Text>
+        {onRetry && (
+          <Button
+            appearance="primary"
+            icon={<ArrowClockwise24Regular />}
+            onClick={onRetry}
+            style={{ marginTop: tokens.spacingVerticalL }}
+          >
+            Retry
+          </Button>
+        )}
       </div>
     );
   }

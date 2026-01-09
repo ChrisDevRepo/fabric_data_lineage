@@ -14,14 +14,17 @@
  */
 
 import { DataNode } from './types';
+import { VwSource } from './LineageService';
 
 const CACHE_PREFIX = 'datalineage_cache_';
-const DEFAULT_TTL_MINUTES = 60 * 24; // 24 hours
+const DEFAULT_TTL_MINUTES = 60 * 24 * 7; // 7 days
 
 export interface CachedLineageData {
   data: DataNode[];
+  sources?: VwSource[]; // Cached sources for dropdown (small, ~1KB)
   timestamp: string;
   endpoint: string;
+  sourceId?: number; // Source ID this cache is for
   version: number; // For cache invalidation on schema changes
 }
 
@@ -40,18 +43,31 @@ const CACHE_VERSION = 1; // Increment when DataNode schema changes
  */
 export class LineageCacheService {
   private itemId: string;
+  private sourceId: number | undefined;
   private ttlMinutes: number;
 
-  constructor(itemId: string, ttlMinutes: number = DEFAULT_TTL_MINUTES) {
+  constructor(itemId: string, sourceId?: number, ttlMinutes: number = DEFAULT_TTL_MINUTES) {
     this.itemId = itemId;
+    this.sourceId = sourceId;
     this.ttlMinutes = ttlMinutes;
   }
 
   /**
-   * Get the cache key for this item
+   * Get the cache key for this item (source-aware)
+   * Format: datalineage_cache_{itemId}_src{sourceId}
    */
   private getCacheKey(): string {
+    if (this.sourceId !== undefined) {
+      return `${CACHE_PREFIX}${this.itemId}_src${this.sourceId}`;
+    }
     return `${CACHE_PREFIX}${this.itemId}`;
+  }
+
+  /**
+   * Update source ID (creates new cache key)
+   */
+  setSourceId(sourceId: number | undefined): void {
+    this.sourceId = sourceId;
   }
 
   /**
@@ -141,12 +157,14 @@ export class LineageCacheService {
   /**
    * Save data to cache
    */
-  set(data: DataNode[], endpoint: string): void {
+  set(data: DataNode[], endpoint: string, sources?: VwSource[]): void {
     try {
       const cacheData: CachedLineageData = {
         data,
+        sources,
         timestamp: new Date().toISOString(),
         endpoint,
+        sourceId: this.sourceId,
         version: CACHE_VERSION,
       };
 
@@ -154,6 +172,19 @@ export class LineageCacheService {
     } catch {
       // localStorage might be full or disabled - try to clear old caches
       this.clearOldCaches();
+    }
+  }
+
+  /**
+   * Get cached sources list (for database dropdown)
+   */
+  getSources(): VwSource[] | null {
+    try {
+      const cached = this.getRawCache();
+      if (!cached || cached.version !== CACHE_VERSION) return null;
+      return cached.sources || null;
+    } catch {
+      return null;
     }
   }
 
@@ -234,6 +265,6 @@ export class LineageCacheService {
 /**
  * Create a cache service for an item
  */
-export function createCacheService(itemId: string, ttlMinutes?: number): LineageCacheService {
-  return new LineageCacheService(itemId, ttlMinutes);
+export function createCacheService(itemId: string, sourceId?: number, ttlMinutes?: number): LineageCacheService {
+  return new LineageCacheService(itemId, sourceId, ttlMinutes);
 }

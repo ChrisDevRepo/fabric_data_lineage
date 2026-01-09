@@ -37,28 +37,3 @@ export type {
   RibbonActionButton,
   FluentIconComponent
 } from './ItemEditor/';
-
-// Wizard Component - Step-by-step guided workflows
-export { 
-  WizardControl
-} from './Wizard/';
-
-export type { 
-  WizardStep, 
-  WizardControlProps,
-  WizardStepProps,
-  WizardNavigationProps
-} from './Wizard/';
-
-// OneLakeView Component - OneLake item browsing and selection
-export { 
-  OneLakeView
-} from './OneLakeView/';
-
-export type { 
-  OneLakeViewProps,
-  OneLakeViewItem,
-  TableMetadata,
-  FileMetadata,
-  LoadingStatus
-} from './OneLakeView/';
