@@ -28,6 +28,7 @@ package-lock.json
 
 # OS
 .DS_Store
+nul
 Thumbs.db
 
 # Logs

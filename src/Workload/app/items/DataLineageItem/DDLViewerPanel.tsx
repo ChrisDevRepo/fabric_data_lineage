@@ -5,9 +5,11 @@
  *
  * Uses shared Monaco config from monacoConfig.ts for consistency
  * with DDLViewer component used in DataLineageSearchPage.
+ *
+ * DDL is loaded on-demand via useDdlLoader hook (not pre-loaded).
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import {
   Button,
@@ -21,25 +23,42 @@ import {
   Copy24Regular,
   DocumentSearch24Regular,
   Code24Regular,
+  ArrowClockwise24Regular,
 } from '@fluentui/react-icons';
 import { MONACO_EDITOR_OPTIONS } from './monacoConfig';
+import { useDdlLoader } from './useDdlLoader';
+import { LineageService } from './LineageService';
 
 export interface DDLViewerNode {
   id: string;
+  objectId: number; // Numeric ID for GraphQL query
   name: string;
   schema: string;
   objectType: string;
-  ddlText: string | null;
 }
 
 export interface DDLViewerPanelProps {
   node: DDLViewerNode | null;
   isOpen: boolean;
   onClose: () => void;
+  service: LineageService | null;
+  sourceId?: number;
 }
 
-export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
+export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDLViewerPanelProps) {
   const editorRef = useRef<any>(null);
+  const { ddlText, isLoading, error, loadDdl, retry, clear } = useDdlLoader(service);
+
+  // Load DDL when node changes
+  useEffect(() => {
+    if (isOpen && node && service) {
+      loadDdl(node.objectId, sourceId);
+    }
+    // Clear state when panel closes
+    if (!isOpen) {
+      clear();
+    }
+  }, [isOpen, node?.objectId, sourceId, service, loadDdl, clear]);
 
   // Handle editor mount - store reference for search functionality
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
@@ -53,15 +72,15 @@ export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
 
   // Copy DDL to clipboard
   const handleCopy = useCallback(async () => {
-    if (node?.ddlText) {
+    if (ddlText) {
       try {
-        await navigator.clipboard.writeText(node.ddlText);
+        await navigator.clipboard.writeText(ddlText);
         // Could add notification here via Fabric SDK
       } catch (err) {
         console.error('Failed to copy DDL:', err);
       }
     }
-  }, [node?.ddlText]);
+  }, [ddlText]);
 
   // Open search in editor
   const handleSearch = useCallback(() => {
@@ -90,7 +109,7 @@ export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
           </div>
         </div>
         <div className="ddl-viewer-panel__actions">
-          {node?.ddlText && (
+          {ddlText && (
             <>
               <Tooltip content="Search (Ctrl+F)" relationship="label">
                 <Button
@@ -134,7 +153,31 @@ export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
               Right-click a node and select "View DDL" to see its definition
             </Text>
           </div>
-        ) : !node.ddlText ? (
+        ) : isLoading ? (
+          // Loading state
+          <div className="ddl-viewer-panel__empty">
+            <Spinner size="large" label="Loading DDL..." />
+          </div>
+        ) : error ? (
+          // Error state with retry
+          <div className="ddl-viewer-panel__empty">
+            <Code24Regular style={{ fontSize: 48, color: tokens.colorPaletteRedForeground1 }} />
+            <Text size={400} style={{ color: tokens.colorPaletteRedForeground1 }}>
+              Failed to load DDL
+            </Text>
+            <Text size={300} style={{ color: tokens.colorNeutralForeground3, textAlign: 'center' }}>
+              {error}
+            </Text>
+            <Button
+              appearance="primary"
+              icon={<ArrowClockwise24Regular />}
+              onClick={retry}
+              style={{ marginTop: tokens.spacingVerticalL }}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : !ddlText ? (
           // Node selected but no DDL available
           <div className="ddl-viewer-panel__empty">
             <Code24Regular style={{ fontSize: 48, color: tokens.colorNeutralForeground4 }} />
@@ -153,7 +196,7 @@ export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
             height="100%"
             language="sql"
             theme="vs" // Light theme to match Fabric
-            value={node.ddlText}
+            value={ddlText}
             onMount={handleEditorMount}
             options={MONACO_EDITOR_OPTIONS}
             loading={
@@ -166,7 +209,7 @@ export function DDLViewerPanel({ node, isOpen, onClose }: DDLViewerPanelProps) {
       </div>
 
       {/* Footer with keyboard hint */}
-      {node?.ddlText && (
+      {ddlText && (
         <div className="ddl-viewer-panel__footer">
           <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
             Press <kbd>Ctrl+F</kbd> to search

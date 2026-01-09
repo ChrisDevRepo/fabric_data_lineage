@@ -329,22 +329,48 @@
             margin: 0 auto;
         }
 
-        .demo-video {
+        .demo-video-link {
+            display: block;
             position: relative;
-            padding-bottom: 56.25%;
             border-radius: 12px;
             overflow: hidden;
-            background: #000;
             box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            transition: box-shadow 0.2s, transform 0.2s;
         }
 
-        .demo-video iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .demo-video-link:hover {
+            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+        }
+
+        .demo-video-link img {
             width: 100%;
-            height: 100%;
-            border: none;
+            height: auto;
+            display: block;
+        }
+
+        .demo-video-link:hover img {
+            opacity: 0.9;
+        }
+
+        .play-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 72px;
+            height: 72px;
+            background: #FF0000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+
+        .demo-video-link:hover .play-button {
+            transform: translate(-50%, -50%) scale(1.1);
         }
 
         /* Scope Section */
@@ -439,6 +465,15 @@
             font-size: 0.95rem;
         }
 
+        .arch-step-content a {
+            color: var(--fabric-primary);
+            text-decoration: none;
+        }
+
+        .arch-step-content a:hover {
+            text-decoration: underline;
+        }
+
         .architecture-diagram-placeholder {
             max-width: 800px;
             margin: 0 auto;
@@ -450,73 +485,69 @@
             border-radius: 8px;
         }
 
-        /* Getting Started Section */
+        /* Quick Start Section */
         .getting-started-section {
             padding: 4rem 2rem;
             background: var(--fabric-background);
         }
 
-        .quickstart-box {
-            background: var(--fabric-surface);
-            border: 1px solid var(--fabric-border);
-            border-radius: 12px;
-            padding: 2.5rem;
-            max-width: 800px;
-            margin: 0 auto;
-            text-align: center;
-        }
-
-        .quickstart-box h3 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .quickstart-box p {
-            color: var(--fabric-text-secondary);
-            margin-bottom: 1.5rem;
-            font-size: 1.05rem;
-        }
-
-        .quickstart-steps {
+        .quickstart-cards {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1.5rem;
-            margin: 2rem 0;
-            text-align: left;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
-        .quickstart-step {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
+        .quickstart-card {
+            background: var(--fabric-surface);
+            border: 1px solid var(--fabric-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
         }
 
-        .step-num {
+        .quickstart-card .card-num {
+            width: 36px;
+            height: 36px;
             background: var(--fabric-primary);
             color: white;
-            width: 28px;
-            height: 28px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 0.875rem;
-            flex-shrink: 0;
+            font-size: 1rem;
+            margin: 0 auto 1rem;
         }
 
-        .step-text {
-            font-size: 0.95rem;
+        .quickstart-card h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 0.5rem;
+            color: var(--fabric-text);
         }
 
-        .step-text strong {
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-
-        .step-text span {
+        .quickstart-card p {
+            font-size: 0.9rem;
             color: var(--fabric-text-secondary);
-            font-size: 0.875rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .quickstart-card a {
+            color: var(--fabric-primary);
+            text-decoration: none;
+        }
+
+        .quickstart-card a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .quickstart-cards {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Creator Section */
@@ -783,19 +814,21 @@
 
     <!-- Demo Section -->
     <section id="demo" class="demo-section">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-bold text-slate-900 mb-8">See It In Action</h2>
-            <a href="https://youtu.be/hE5UCSByBo0" target="_blank" class="block relative rounded-xl overflow-hidden shadow-2xl border border-slate-200 hover:shadow-3xl transition group">
-                <img src="images/datalineage-youtube.png" alt="Data Lineage Demo Video" class="w-full h-auto group-hover:opacity-90 transition">
-                <div class="absolute inset-0 flex items-center justify-center">
-                    <div class="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center group-hover:scale-110 transition shadow-2xl">
-                        <i class="fa-solid fa-play text-white text-2xl ml-1"></i>
+        <div class="section-content">
+            <div class="section-header">
+                <h2>See It In Action</h2>
+            </div>
+            <div class="demo-container">
+                <a href="https://youtu.be/hE5UCSByBo0" target="_blank" class="demo-video-link">
+                    <img src="images/datalineage-youtube.png" alt="Data Lineage Demo Video">
+                    <div class="play-button">
+                        <svg viewBox="0 0 24 24" fill="white" width="32" height="32"><path d="M8 5v14l11-7z"/></svg>
                     </div>
-                </div>
-            </a>
-            <p class="mt-6 text-slate-600">
-                Click to watch: Full walkthrough of trace mode, schema filtering, and interactive features
-            </p>
+                </a>
+                <p style="margin-top: 1.5rem; color: var(--fabric-text-secondary); text-align: center;">
+                    Click to watch: Full walkthrough of trace mode, schema filtering, and interactive features
+                </p>
+            </div>
         </div>
     </section>
 
@@ -866,52 +899,32 @@
         </div>
     </section>
 
-    <!-- Getting Started Section -->
-    <section id="getting-started" class="getting-started-section">
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="getting-started-section">
         <div class="section-content">
-            <div id="quickstart" class="quickstart-box">
-                <h3>🚀 Quick Start</h3>
-                <p>Try Fabric Data Lineage in minutes using Demo Mode.</p>
-                <div class="quickstart-steps">
-                    <div class="quickstart-step">
-                        <h4>1. Prerequisites</h4>
-                        <p>• Fabric workspace (Contributor+ permissions)<br>
-                        • Workload enabled by admin (<a href="https://github.com/ChrisDevRepo/fabric_data_lineage/blob/main/docs/ADMIN_SETUP.md" target="_blank">Admin Setup</a>)</p>
-                    </div>
-                    <div class="quickstart-step">
-                        <h4>2. Try with Demo Mode</h4>
-                        <p>• <strong>+ New</strong> > <strong>Data Lineage</strong> (under custom workloads)<br>
-                        • Open <strong>Settings</strong> > <strong>Connection</strong> tab<br>
-                        • Toggle <strong>Demo Mode</strong> on<br>
-                        • Click <strong>Refresh</strong></p>
-                    </div>
-                    <div class="quickstart-step">
-                        <h4>3. Connect Real Data</h4>
-                        <p>For production use with your Data Warehouse:<br>
-                        • Download assets from <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/tree/main/setup" target="_blank">setup/</a><br>
-                        • Follow the README in that folder</p>
-                    </div>
-                </div>
-                <p style="margin-top: 20px; text-align: center;">
-                    <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/blob/main/docs/QUICKSTART.md" target="_blank" class="btn">Full Quick Start Guide →</a>
-                </p>
+            <div class="section-header">
+                <h2>Quick Start</h2>
+                <p>Try it in minutes with Demo Mode</p>
             </div>
-
-            <div class="quickstart-box">
-                <h3>🛠️ Setup & Deployment</h3>
-                <div style="text-align: left; max-width: 600px; margin: 1.5rem auto;">
-                    <p style="margin-bottom: 1rem;">High-level workflow:</p>
-                    <ul style="list-style: none; padding: 0; color: var(--fabric-text-secondary); line-height: 2;">
-                        <li>📦 <strong>Build:</strong> Clone repo, build workload package with PowerShell scripts</li>
-                        <li>🚀 <strong>Deploy:</strong> Upload package to Fabric tenant via Admin Portal</li>
-                        <li>⚙️ <strong>Enable:</strong> Admin activates workload for capacities</li>
-                        <li>📊 <strong>Use:</strong> Create Data Lineage item, connect to warehouse or try demo mode</li>
-                    </ul>
+            <div class="quickstart-cards">
+                <div class="quickstart-card">
+                    <div class="card-num">1</div>
+                    <h4>Prerequisites</h4>
+                    <p>Fabric workspace with workload <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/blob/main/docs/ADMIN_SETUP.md" target="_blank">enabled</a></p>
                 </div>
-                <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
-                    <a href="https://github.com/ChrisDevRepo/fabric_data_lineage#setup" target="_blank" class="btn btn-primary">Full Setup Guide</a>
-                    <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/tree/main/docs" target="_blank" class="btn">Documentation</a>
+                <div class="quickstart-card">
+                    <div class="card-num">2</div>
+                    <h4>Create Item</h4>
+                    <p>+ New → Data Lineage<br>Enable Demo Mode in Settings</p>
                 </div>
+                <div class="quickstart-card">
+                    <div class="card-num">3</div>
+                    <h4>Production Setup</h4>
+                    <p>Follow <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/tree/main/setup" target="_blank">setup guide</a> for real data</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="https://github.com/ChrisDevRepo/fabric_data_lineage/blob/main/docs/QUICKSTART.md" target="_blank" class="btn btn-primary">Full Quick Start Guide →</a>
             </div>
         </div>
     </section>

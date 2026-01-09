@@ -103,6 +103,15 @@ export function DataLineageItemEditor(props: PageProps) {
   const [hasAttemptedLoadSources, setHasAttemptedLoadSources] = useState(false); // Prevents infinite loop on API failure
   const [activeSourceId, setActiveSourceId] = useState<number | undefined>();
 
+  // Memoized LineageService for on-demand DDL loading (passed to DefaultView)
+  const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
+  const lineageServiceRef = useMemo(() => {
+    if (!workloadClient || !graphqlEndpoint || currentDefinition.useSampleData) {
+      return null;
+    }
+    return createLineageService(workloadClient, graphqlEndpoint);
+  }, [workloadClient, graphqlEndpoint, currentDefinition.useSampleData]);
+
   const location = useLocation();
   const { pathname, search } = location;
 
@@ -804,6 +813,8 @@ export function DataLineageItemEditor(props: PageProps) {
       totalCount={lineageData.length}
       excludedCount={excludedCount}
       isDemo={currentDefinition.useSampleData}
+      service={lineageServiceRef}
+      sourceId={activeSourceId}
       onControlsReady={handleControlsReady}
       initialPreferences={{
         ...currentDefinition.preferences,
@@ -813,7 +824,7 @@ export function DataLineageItemEditor(props: PageProps) {
       dataModelTypes={currentDefinition.dataModelConfig?.types}
       onFilterChange={handleFilterChange}
     />
-  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.dataModelConfig?.types, handleFilterChange]);
+  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, lineageServiceRef, activeSourceId, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.dataModelConfig?.types, handleFilterChange]);
 
   // View registration - memoized to prevent unnecessary re-renders
   const views: RegisteredView[] = useMemo(() => [

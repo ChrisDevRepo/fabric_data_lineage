@@ -1,0 +1,51 @@
+name: Deploy Frontend to Azure Static Web App
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+env:
+  # Configure these in GitHub repository settings > Secrets and variables > Actions
+  WORKLOAD_NAME: Org.DataLineage
+  WORKLOAD_VERSION: ${{ vars.WORKLOAD_VERSION || '1.0.0' }}
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and Deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: src/Workload/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd src/Workload
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd src/Workload
+          npm run build:prod
+        env:
+          WORKLOAD_NAME: ${{ env.WORKLOAD_NAME }}
+          WORKLOAD_VERSION: ${{ env.WORKLOAD_VERSION }}
+          FRONTEND_APPID: ${{ secrets.FRONTEND_APPID }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+
+      - name: Copy staticwebapp.config.json
+        run: cp src/Workload/app/staticwebapp.config.json src/build/Frontend/
+
+      - name: Deploy to Azure Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "src/build/Frontend"
+          skip_app_build: true
+          skip_api_build: true

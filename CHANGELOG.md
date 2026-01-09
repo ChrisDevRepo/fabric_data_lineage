@@ -5,18 +5,24 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
-## [1.4.0] - 2026-01-07
-- Performance improvements: extended cache TTL, added warm-up queries
+## [1.3.2] - 2026-01-09
+
+### Changed
+- DDL loaded on-demand (only when viewing SQL) for faster initial graph load
+- Database cache preserved when switching between sources
+- Added `staticwebapp.config.json` for SPA routing (fixes 404 on deep links)
+- Simplified Quick Start section on landing page (cleaner layout, less text)
 
 ## [1.3.1] - 2026-01-03
-- Hotfix: infinite retry loop when GraphQL API fails
+
+### Fixed
+- Infinite retry loop when GraphQL API fails
 - Improved error handling in notebook pipeline
 
 ### Added
-- "No data found" message when database is empty (with troubleshooting hints)
+- "No data found" message when database is empty
 - `hasAttemptedLoadSources` flag to prevent API call loops
 - Troubleshooting section in setup docs
-- SPN setup instructions in admin docs
 
 ## [1.3.0] - 2026-01-02
 
