@@ -218,6 +218,25 @@
     }
   }
 
+  // Centered loading overlay for refresh/loading states
+  &__loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.7);
+    z-index: 100;
+
+    // Dark mode support
+    @media (prefers-color-scheme: dark) {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  }
+
   &__stats {
     display: flex;
     gap: var(--spacingHorizontalL);

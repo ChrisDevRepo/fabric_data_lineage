@@ -47,9 +47,10 @@ import {
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
+  Spinner,
   Text,
 } from '@fluentui/react-components';
-import { DataNode, ObjectType } from './types';
+import { DataNode, ObjectType, ExternalRefType } from './types';
 import { LineageNode } from './LineageNode';
 import { useGraphology } from './useGraphology';
 import { useLineageFilters } from './useLineageFilters';
@@ -59,7 +60,7 @@ import { LineageToolbar } from './LineageToolbar';
 import { TraceControls, TraceActiveBanner } from './TraceControls';
 import { NodeContextMenu } from './NodeContextMenu';
 import { DDLViewerPanel, DDLViewerNode } from './DDLViewerPanel';
-import { exportGraphToImage } from './exportUtils';
+import { exportGraphToImage, ExportSettings } from './exportUtils';
 import { LineageService } from './LineageService';
 import {
   DataModelTypeRule,
@@ -116,6 +117,7 @@ export interface DataLineageItemDefaultViewProps {
     selectedSchemas?: string[];
     selectedObjectTypes?: ObjectType[];
     selectedDataModelTypes?: string[];
+    selectedExternalTypes?: ExternalRefType[];
     defaultUpstreamLevels?: number;
     defaultDownstreamLevels?: number;
   };
@@ -126,15 +128,18 @@ export interface DataLineageItemDefaultViewProps {
     selectedSchemas?: string[];
     selectedObjectTypes?: ObjectType[];
     selectedDataModelTypes?: string[];
+    selectedExternalTypes?: ExternalRefType[];
     focusSchema?: string | null;
     hideIsolated?: boolean;
   }) => void;
+  /** Whether data is being refreshed (shows centered overlay) */
+  isRefreshing?: boolean;
 }
 
 export interface GraphControls {
   fitView: () => void;
   focusNode: (nodeId: string) => void;
-  exportToSvg: () => void;
+  exportToImage: (settings: ExportSettings) => void;
 }
 
 // Layout cache for large datasets (> 300 nodes)
@@ -164,6 +169,7 @@ const getLayoutedElements = (
   // Check cache for large datasets
   const nodeIds = nodes.map((n) => n.id);
   const cacheKey = getLayoutCacheKey(nodeIds, direction);
+  const nodeIdSet = new Set(nodeIds);
 
   if (nodes.length > LAYOUT_CACHE_THRESHOLD && layoutCache.has(cacheKey)) {
     const cached = layoutCache.get(cacheKey)!;
@@ -175,7 +181,11 @@ const getLayoutedElements = (
         position: pos || { x: 0, y: 0 },
       };
     });
-    return { nodes: layoutedNodes, edges };
+    // Filter edges to only include those with valid source and target nodes
+    const validEdges = edges.filter(edge =>
+      nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target)
+    );
+    return { nodes: layoutedNodes, edges: validEdges };
   }
 
   // Calculate layout using Dagre
@@ -194,8 +204,12 @@ const getLayoutedElements = (
     dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
   });
 
+  // Only add edges where BOTH source and target nodes exist
+  // This prevents dagre from auto-creating phantom nodes
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+    if (nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target)) {
+      dagreGraph.setEdge(edge.source, edge.target);
+    }
   });
 
   dagre.layout(dagreGraph);
@@ -215,6 +229,12 @@ const getLayoutedElements = (
     };
   });
 
+  // Filter edges to only include those with valid source and target nodes
+  // This ensures ReactFlow doesn't render edges to non-existent nodes
+  const validEdges = edges.filter(edge =>
+    nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target)
+  );
+
   // Cache result for large datasets
   if (nodes.length > LAYOUT_CACHE_THRESHOLD) {
     layoutCache.set(cacheKey, { positions });
@@ -227,7 +247,7 @@ const getLayoutedElements = (
     }
   }
 
-  return { nodes: layoutedNodes, edges };
+  return { nodes: layoutedNodes, edges: validEdges };
 };
 
 // Node width calculation constants
@@ -460,6 +480,7 @@ function DataLineageGraphInner({
   initialPreferences,
   dataModelTypes = DEFAULT_DATA_MODEL_TYPES,
   onFilterChange,
+  isRefreshing = false,
 }: DataLineageItemDefaultViewProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -711,8 +732,8 @@ function DataLineageGraphInner({
     }, 100);
   }, [reactFlowInstance, layoutedNodes, lineageGraph]);
 
-  // Handle export to image (captures exactly what's on screen)
-  const handleExportToSvg = useCallback(() => {
+  // Handle export to image (with settings from dialog)
+  const handleExportToImage = useCallback((settings: ExportSettings) => {
     if (nodes.length === 0) {
       console.warn('No nodes to export');
       return;
@@ -720,7 +741,7 @@ function DataLineageGraphInner({
 
     exportGraphToImage({
       reactFlowInstance,
-      format: 'png', // PNG is more reliable than SVG with html-to-image
+      settings,
       title: 'Data Lineage',
     });
   }, [nodes.length, reactFlowInstance]);
@@ -749,13 +770,13 @@ function DataLineageGraphInner({
   const controlsRef = useRef<GraphControls>({
     fitView: () => {},
     focusNode: () => {},
-    exportToSvg: () => {},
+    exportToImage: () => {},
   });
 
   // Update control refs when handlers change
   controlsRef.current.fitView = handleFitView;
   controlsRef.current.focusNode = handleFocusNode;
-  controlsRef.current.exportToSvg = handleExportToSvg;
+  controlsRef.current.exportToImage = handleExportToImage;
 
   // Expose controls to parent component - only once
   useEffect(() => {
@@ -878,7 +899,7 @@ function DataLineageGraphInner({
           onPaneClick={handlePaneClick}
           zoomOnDoubleClick={false}
           nodeTypes={nodeTypes}
-          attributionPosition="bottom-left"
+          proOptions={{ hideAttribution: true }}
           minZoom={0.2}
           maxZoom={2.5}
           defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
@@ -905,6 +926,13 @@ function DataLineageGraphInner({
           />
         </ReactFlow>
         </ErrorBoundary>
+
+        {/* Loading Overlay - centered spinner for refresh/loading states */}
+        {isRefreshing && (
+          <div className="data-lineage-view__loading-overlay">
+            <Spinner size="large" label="Refreshing data..." aria-label="Refreshing data" />
+          </div>
+        )}
 
         {/* Context Menu - rendered outside ReactFlow for proper positioning */}
         {contextMenu && (

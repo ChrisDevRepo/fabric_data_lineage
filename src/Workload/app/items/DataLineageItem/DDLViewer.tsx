@@ -43,6 +43,8 @@ export interface DDLViewerProps {
   height?: string | number;
   /** Show header with object info */
   showHeader?: boolean;
+  /** Callback when Monaco editor is ready (for external access to editor instance) */
+  onEditorReady?: (editor: any) => void;
 }
 
 export function DDLViewer({
@@ -55,6 +57,7 @@ export function DDLViewer({
   onRetry,
   height = '100%',
   showHeader = true,
+  onEditorReady,
 }: DDLViewerProps) {
   const editorRef = useRef<any>(null);
 
@@ -66,7 +69,10 @@ export function DDLViewer({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
       editor.getAction('actions.find')?.run();
     });
-  }, []);
+
+    // Notify parent if callback provided
+    onEditorReady?.(editor);
+  }, [onEditorReady]);
 
   // Determine if this object type has DDL
   const hasDdlType =

@@ -42,6 +42,40 @@ const CACHE_VERSION = 1; // Increment when DataNode schema changes
  * LineageCacheService for localStorage-based caching
  */
 export class LineageCacheService {
+  /**
+   * Get the global sources cache key (item-level, not per-source)
+   */
+  private static getSourcesKey(itemId: string): string {
+    return `${CACHE_PREFIX}${itemId}_sources`;
+  }
+
+  /**
+   * Save sources list globally (for offline dropdown)
+   */
+  static setCachedSources(itemId: string, sources: VwSource[]): void {
+    try {
+      const data = { sources, timestamp: new Date().toISOString(), version: CACHE_VERSION };
+      localStorage.setItem(LineageCacheService.getSourcesKey(itemId), JSON.stringify(data));
+    } catch {
+      // localStorage might be full - silently fail
+    }
+  }
+
+  /**
+   * Get cached sources list (for offline dropdown fallback)
+   */
+  static getCachedSources(itemId: string): VwSource[] | null {
+    try {
+      const raw = localStorage.getItem(LineageCacheService.getSourcesKey(itemId));
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data.version !== CACHE_VERSION) return null;
+      return data.sources || null;
+    } catch {
+      return null;
+    }
+  }
+
   private itemId: string;
   private sourceId: number | undefined;
   private ttlMinutes: number;

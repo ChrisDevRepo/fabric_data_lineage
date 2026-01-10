@@ -1,50 +1,107 @@
 /**
  * Export Utilities for Data Lineage Graph
  *
- * Captures the actual ReactFlow viewport and exports as SVG/PNG.
- * Uses html-to-image library to export exactly what's on screen.
- * NO duplicate rendering code - what you see is what you export.
+ * Exports current view as PNG or JPEG (WYSIWYG).
+ * Options: Legend toggle, high resolution (2x)
  *
  * Reference: https://reactflow.dev/examples/misc/download-image
  * Note: html-to-image locked to version 1.11.11 (last working version)
+ *
+ * Known limitation: "Fit all nodes" feature removed due to edge clipping
+ * issues with html-to-image (GitHub issue xyflow/xyflow#2118).
  */
 
-import { toPng, toSvg } from 'html-to-image';
-import { getNodesBounds, getViewportForBounds, ReactFlowInstance } from 'reactflow';
+import { toPng, toJpeg } from 'html-to-image';
+import { ReactFlowInstance } from 'reactflow';
 import { getThemeColors } from './useReactFlowTheme';
+import type { ExportSettings } from './ExportDialog';
+
+// Re-export for convenience
+export type { ExportSettings, ExportFormat } from './ExportDialog';
 
 export interface ExportOptions {
-  /** ReactFlow instance for bounds calculation */
+  /** ReactFlow instance */
   reactFlowInstance: ReactFlowInstance;
-  /** Export format */
-  format?: 'svg' | 'png';
-  /** Image width (default: 1920) */
-  width?: number;
-  /** Image height (default: 1080) */
-  height?: number;
-  /** Background color (default: theme-aware) */
-  backgroundColor?: string;
+  /** Export settings from dialog */
+  settings: ExportSettings;
   /** Title for the filename */
   title?: string;
 }
 
 /**
- * Export the graph as an image (SVG or PNG)
- * Captures exactly what's rendered on screen - no duplicate code
- * Background color adapts to current theme (light/dark)
+ * Helper function to get date string for filename
+ */
+function getDateStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Helper function to trigger download
+ */
+function downloadImage(dataUrl: string, filename: string): void {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Filter function to exclude unwanted elements from export
+ */
+function createExportFilter(excludeLegend: boolean) {
+  return (node: HTMLElement): boolean => {
+    // Skip link elements pointing to external stylesheets (causes CORS issues)
+    if (node.tagName === 'LINK') {
+      const href = node.getAttribute('href') || '';
+      if (href.includes('cdn.jsdelivr.net') || href.includes('cdn.office.net')) {
+        return false;
+      }
+    }
+
+    const cl = node.classList;
+    if (!cl) return true;
+
+    // Always exclude minimap and controls
+    if (cl.contains('react-flow__minimap')) return false;
+    if (cl.contains('react-flow__controls')) return false;
+
+    // Optionally exclude panels (legend, toolbar)
+    if (excludeLegend && cl.contains('react-flow__panel')) return false;
+
+    return true;
+  };
+}
+
+/**
+ * Get the export function based on format
+ */
+function getExportFunction(format: 'png' | 'jpeg') {
+  return format === 'jpeg' ? toJpeg : toPng;
+}
+
+/**
+ * Get file extension for format
+ */
+function getFileExtension(format: 'png' | 'jpeg'): string {
+  return format === 'jpeg' ? 'jpg' : format;
+}
+
+/**
+ * Export the graph as an image (current view only)
+ *
+ * @param options Export options including settings from dialog
  */
 export async function exportGraphToImage(options: ExportOptions): Promise<void> {
-  // Get theme-aware default background
   const themeColors = getThemeColors();
-
   const {
     reactFlowInstance,
-    format = 'png',
-    width = 1920,
-    height = 1080,
-    backgroundColor = themeColors.exportBackground,
+    settings,
     title = 'data-lineage',
   } = options;
+
+  const { format, includeLegend, highResolution } = settings;
 
   const nodes = reactFlowInstance.getNodes();
   if (nodes.length === 0) {
@@ -52,67 +109,34 @@ export async function exportGraphToImage(options: ExportOptions): Promise<void> 
     return;
   }
 
-  // Get the viewport element (contains the actual rendered graph)
-  const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
-  if (!viewportElement) {
-    console.error('ReactFlow viewport not found');
+  const container = document.querySelector('.react-flow') as HTMLElement;
+  if (!container) {
+    console.error('ReactFlow container not found');
     return;
   }
 
-  // Calculate bounds to fit all nodes in the export
-  const nodesBounds = getNodesBounds(nodes);
-  const viewport = getViewportForBounds(
-    nodesBounds,
-    width,
-    height,
-    0.5, // minZoom
-    2,   // maxZoom
-    0.25 // padding (25%)
-  );
+  const dateStr = getDateStr();
+  const exportFn = getExportFunction(format);
+  const extension = getFileExtension(format);
 
-  // Prepare filename with date
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const filename = `${title}-${dateStr}.${format}`;
+  // Pixel ratio for high resolution (2x for retina/print)
+  const pixelRatio = highResolution ? 2 : 1;
 
   try {
+    // Capture the container as-is (WYSIWYG)
+    const rect = container.getBoundingClientRect();
     const imageOptions = {
-      backgroundColor,
-      width,
-      height,
-      style: {
-        width: `${width}px`,
-        height: `${height}px`,
-        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-      },
-      // Skip external fonts to avoid CORS errors with Office CDN fonts
+      backgroundColor: themeColors.exportBackground,
+      width: rect.width,
+      height: rect.height,
+      pixelRatio,
+      quality: 0.92, // For JPEG
       skipFonts: true,
-      // Filter out elements that cause CORS issues
-      filter: (node: HTMLElement) => {
-        // Skip link elements pointing to external stylesheets
-        if (node.tagName === 'LINK') {
-          const href = node.getAttribute('href') || '';
-          if (href.includes('cdn.jsdelivr.net') || href.includes('cdn.office.net')) {
-            return false;
-          }
-        }
-        return true;
-      },
+      filter: createExportFilter(!includeLegend),
     };
 
-    let dataUrl: string;
-    if (format === 'svg') {
-      dataUrl = await toSvg(viewportElement, imageOptions);
-    } else {
-      dataUrl = await toPng(viewportElement, imageOptions);
-    }
-
-    // Trigger browser download
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = dataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const dataUrl = await exportFn(container, imageOptions);
+    downloadImage(dataUrl, `${title}-${dateStr}.${extension}`);
   } catch (error) {
     console.error('Failed to export graph:', error);
     throw error;

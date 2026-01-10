@@ -67,6 +67,7 @@ import { callNotificationOpen } from '../../controller/NotificationController';
 import { getWorkloadItem, saveWorkloadItem, ItemWithDefinition } from '../../controller/ItemCRUDController';
 import { NotificationType } from '@ms-fabric/workload-client';
 import { createLineageService, GraphQLTestResult, DEFAULT_GRAPHQL_ENDPOINT } from './LineageService';
+import { LineageCacheService } from './LineageCacheService';
 import {
   DataLineageItemDefinition,
   DataModelIcon,
@@ -555,6 +556,26 @@ export function DataLineageSettingsPanel({ workloadClient }: PageProps) {
               <li>{t('Settings_Step4')}</li>
               <li>{t('Settings_Step5')}</li>
             </ol>
+          </div>
+
+          {/* Clear Cache Button */}
+          <div className={styles.buttonRow} style={{ marginTop: tokens.spacingVerticalL }}>
+            <Button
+              appearance="subtle"
+              icon={<Delete24Regular />}
+              onClick={() => {
+                LineageCacheService.clearAll();
+                callNotificationOpen(
+                  workloadClient,
+                  t('Settings_CacheCleared'),
+                  t('Settings_CacheClearedDesc'),
+                  undefined,
+                  undefined
+                );
+              }}
+            >
+              {t('Settings_ClearCache')}
+            </Button>
           </div>
         </div>
       </div>

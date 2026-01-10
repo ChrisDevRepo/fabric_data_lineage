@@ -51,6 +51,26 @@ export async function callSettingsPanelOpen(
 }
 
 /**
+ * Opens a full-width panel for search experience.
+ * Uses full screen width to provide same visual as a page while using reliable panel.open API.
+ * This works in dev mode where page.open may fail.
+ */
+export async function callSearchPanelOpen(
+    workloadClient: WorkloadClientAPI,
+    workloadName: string,
+    path: string) {
+
+    await workloadClient.panel.open({
+        workloadName,
+        route: { path },
+        options: {
+            width: window.innerWidth,
+            isLightDismiss: false
+        }
+    });
+}
+
+/**
  * Calls the 'panel.close' function from the WorkloadClientAPI to close a panel.
  *
  * @param {WorkloadClientAPI} workloadClient - An instance of the WorkloadClientAPI.

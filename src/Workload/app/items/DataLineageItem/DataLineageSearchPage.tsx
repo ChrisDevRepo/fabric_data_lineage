@@ -9,14 +9,10 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Button,
   Input,
-  Popover,
-  PopoverTrigger,
-  PopoverSurface,
-  Checkbox,
   Text,
   Tooltip,
   tokens,
@@ -25,11 +21,10 @@ import {
   Search24Regular,
   Dismiss24Regular,
   ArrowLeft24Regular,
-  Database24Regular,
-  Code24Regular,
 } from '@fluentui/react-icons';
 import { PageProps } from '../../App';
 import { getWorkloadItem } from '../../controller/ItemCRUDController';
+import { callPanelClose } from '../../controller/PanelController';
 import { createLineageService, SearchResult } from './LineageService';
 import { DataLineageItemDefinition, DEFAULT_DEFINITION, mergeWithDefaults } from './DataLineageItemDefinition';
 import { SearchResultsList } from './SearchResultsList';
@@ -45,12 +40,12 @@ interface ContextProps {
   itemObjectId: string;
 }
 
-// Available object types for filtering (excluding Table as it has no DDL)
-const OBJECT_TYPES = ['View', 'Stored Procedure', 'Function'];
+// SessionStorage keys for panel-editor communication
+export const PENDING_FOCUS_NODE_KEY = 'datalineage:pendingFocusNode';
+export const SEARCH_FILTERS_KEY = 'datalineage:searchFilters';
 
 export function DataLineageSearchPage({ workloadClient }: PageProps) {
   const { itemObjectId } = useParams<ContextProps>();
-  const history = useHistory();
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,10 +55,9 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Filter state
-  const [availableSchemas, setAvailableSchemas] = useState<string[]>([]);
-  const [selectedSchemas, setSelectedSchemas] = useState<Set<string>>(new Set());
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(OBJECT_TYPES));
+  // Filter state (synced from editor via sessionStorage)
+  const [selectedSchemas, setSelectedSchemas] = useState<string[] | undefined>(undefined);
+  const [selectedTypes, setSelectedTypes] = useState<string[] | undefined>(undefined);
 
   // Resizable panel state (percentage for results panel height)
   const [resultsPanelHeight, setResultsPanelHeight] = useState(DETAIL_SEARCH_HEIGHT_DEFAULT_PCT);
@@ -73,7 +67,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   // Service ref
   const serviceRef = useRef<ReturnType<typeof createLineageService> | null>(null);
 
-  // Initialize service (load item definition to get endpoint) and load available schemas
+  // Initialize service and load filters from editor
   useEffect(() => {
     if (!workloadClient) return;
 
@@ -95,14 +89,14 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
         // Create service with endpoint from item definition
         serviceRef.current = createLineageService(workloadClient, graphqlEndpoint);
 
-        // Warm-up: Fire-and-forget query to wake up SQL database
-        serviceRef.current.getSources().catch(() => {});
-
-        // Load schemas for filter dropdown
-        const objects = await serviceRef.current.getObjects();
-        const schemas = [...new Set(objects.map((o) => o.schema_name))].sort();
-        setAvailableSchemas(schemas);
-        setSelectedSchemas(new Set(schemas)); // Select all by default
+        // Load filters synced from editor (if available)
+        const savedFilters = sessionStorage.getItem(SEARCH_FILTERS_KEY);
+        if (savedFilters) {
+          sessionStorage.removeItem(SEARCH_FILTERS_KEY);
+          const { selectedSchemas: selSchemas, selectedTypes: selTypes } = JSON.parse(savedFilters);
+          if (selSchemas?.length) setSelectedSchemas(selSchemas);
+          if (selTypes?.length) setSelectedTypes(selTypes);
+        }
       } catch (err) {
         console.error('Failed to initialize search service:', err);
         setSearchError(err instanceof Error ? err.message : 'Failed to initialize search');
@@ -121,12 +115,9 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSubmittedQuery(query);
 
     try {
-      const schemasFilter = selectedSchemas.size < availableSchemas.length
-        ? [...selectedSchemas].join(',')
-        : undefined;
-      const typesFilter = selectedTypes.size < OBJECT_TYPES.length
-        ? [...selectedTypes].join(',')
-        : undefined;
+      // Pass filters from editor (undefined = search all)
+      const schemasFilter = selectedSchemas?.join(',');
+      const typesFilter = selectedTypes?.join(',');
 
       const searchResults = await serviceRef.current.searchDdl(
         query.trim(),
@@ -150,7 +141,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     } finally {
       setIsSearching(false);
     }
-  }, [selectedSchemas, selectedTypes, availableSchemas.length]);
+  }, [selectedSchemas, selectedTypes]);
 
   // Handle search submit (Enter key)
   const handleSearchSubmit = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -178,23 +169,15 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSelectedResult(result);
   }, []);
 
-  // Handle back navigation - navigate to editor with focusNode param if object selected
-  const handleBack = useCallback(() => {
-    if (!itemObjectId) {
-      console.error('Cannot navigate back: itemObjectId is missing from route');
-      return;
-    }
-
-    const editorPath = `/DataLineageItem-editor/${itemObjectId}`;
-
+  // Handle back navigation - close panel and optionally focus on selected node
+  const handleBack = useCallback(async () => {
+    // Store focus node in sessionStorage (editor checks this after panel closes)
     if (selectedResult) {
-      // Build node ID in the format used by ReactFlow: {source_id}_{object_id}
       const nodeId = `${selectedResult.source_id}_${selectedResult.object_id}`;
-      history.push(`${editorPath}?focusNode=${encodeURIComponent(nodeId)}`);
-    } else {
-      history.push(editorPath);
+      sessionStorage.setItem(PENDING_FOCUS_NODE_KEY, nodeId);
     }
-  }, [history, itemObjectId, selectedResult]);
+    await callPanelClose(workloadClient);
+  }, [workloadClient, selectedResult]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -234,50 +217,6 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
-
-  // Schema filter toggle
-  const toggleSchema = useCallback((schema: string) => {
-    setSelectedSchemas((prev) => {
-      const next = new Set(prev);
-      if (next.has(schema)) {
-        next.delete(schema);
-      } else {
-        next.add(schema);
-      }
-      return next;
-    });
-  }, []);
-
-  // Type filter toggle
-  const toggleType = useCallback((type: string) => {
-    setSelectedTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  }, []);
-
-  // Select all/none for schemas
-  const selectAllSchemas = useCallback(() => {
-    setSelectedSchemas(new Set(availableSchemas));
-  }, [availableSchemas]);
-
-  const selectNoSchemas = useCallback(() => {
-    setSelectedSchemas(new Set());
-  }, []);
-
-  // Select all/none for types
-  const selectAllTypes = useCallback(() => {
-    setSelectedTypes(new Set(OBJECT_TYPES));
-  }, []);
-
-  const selectNoTypes = useCallback(() => {
-    setSelectedTypes(new Set());
-  }, []);
 
   return (
     <div className="data-lineage-search">
@@ -327,80 +266,6 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
               Search
             </Button>
           </div>
-
-          {/* Schema filter */}
-          <Popover>
-            <PopoverTrigger>
-              <Tooltip content="Filter by schema" relationship="label">
-                <Button
-                  appearance="subtle"
-                  icon={<Database24Regular />}
-                >
-                  Schemas ({selectedSchemas.size}/{availableSchemas.length})
-                </Button>
-              </Tooltip>
-            </PopoverTrigger>
-            <PopoverSurface className="data-lineage-search__filter-popover">
-              <div className="filter-popover-header">
-                <Text weight="semibold">Schemas</Text>
-                <div className="filter-popover-actions">
-                  <Button size="small" appearance="subtle" onClick={selectAllSchemas}>
-                    All
-                  </Button>
-                  <Button size="small" appearance="subtle" onClick={selectNoSchemas}>
-                    None
-                  </Button>
-                </div>
-              </div>
-              <div className="filter-popover-list">
-                {availableSchemas.map((schema) => (
-                  <Checkbox
-                    key={schema}
-                    label={schema}
-                    checked={selectedSchemas.has(schema)}
-                    onChange={() => toggleSchema(schema)}
-                  />
-                ))}
-              </div>
-            </PopoverSurface>
-          </Popover>
-
-          {/* Type filter */}
-          <Popover>
-            <PopoverTrigger>
-              <Tooltip content="Filter by object type" relationship="label">
-                <Button
-                  appearance="subtle"
-                  icon={<Code24Regular />}
-                >
-                  Types ({selectedTypes.size}/{OBJECT_TYPES.length})
-                </Button>
-              </Tooltip>
-            </PopoverTrigger>
-            <PopoverSurface className="data-lineage-search__filter-popover">
-              <div className="filter-popover-header">
-                <Text weight="semibold">Object Types</Text>
-                <div className="filter-popover-actions">
-                  <Button size="small" appearance="subtle" onClick={selectAllTypes}>
-                    All
-                  </Button>
-                  <Button size="small" appearance="subtle" onClick={selectNoTypes}>
-                    None
-                  </Button>
-                </div>
-              </div>
-              <div className="filter-popover-list">
-                {OBJECT_TYPES.map((type) => (
-                  <Checkbox
-                    key={type}
-                    label={type}
-                    checked={selectedTypes.has(type)}
-                    onChange={() => toggleType(type)}
-                  />
-                ))}
-              </div>
-            </PopoverSurface>
-          </Popover>
         </div>
 
         <div className="data-lineage-search__header-right">

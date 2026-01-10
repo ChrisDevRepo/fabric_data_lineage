@@ -44,7 +44,7 @@
     "Help_Developer_Title": "For developers",
     "Help_Developer_Content": "Parser extracts table references (FROM, JOIN, INSERT, EXEC) via regex. Customize patterns in the Notebook.",
     "Help_CreatedBy": "Created by",
-    "Help_BuiltWith": "Built with",
+    "Help_BuiltWith": "Built with Claude Code",
     "Help_GotIt": "Got it",
 
     "Refresh": "Refresh",
@@ -52,6 +52,11 @@
     "Expand": "Expand",
     "DetailSearch": "Detail Search",
     "ExportImage": "Export",
+    "ExportGraph": "Export Graph",
+    "Format": "Format",
+    "Options": "Options",
+    "ExportIncludeLegend": "Include legend",
+    "ExportHighResolution": "High resolution (2x for print/retina)",
     "Database": "Database",
 
     "LoadingData": "Loading lineage data...",
@@ -61,18 +66,23 @@
     "DataLineage": "Data Lineage",
     "ExpandedView": "Expanded View",
 
+    "Switching": "Switching to",
     "Database_Changed": "Database Changed",
     "Database_Changed_Message": "Switched to new database and reloaded data",
     "Database_Change_Failed": "Database Change Failed",
     "Database_Change_Failed_Message": "Failed to switch database",
-    "Save_Success": "Saved",
-    "Save_Success_Message": "Item saved successfully",
+    "Save_Success": "Settings Saved",
+    "Save_Success_Message": "Filter settings saved as team default",
     "Save_Failed": "Save Failed",
     "Save_Failed_Message": "Failed to save item",
     "Refresh_Success": "Data Loaded",
-    "Refresh_Success_Message": "Loaded {{count}} objects from GraphQL",
+    "Refresh_Success_Message": "Loaded {{count}} objects from {{database}}",
     "Refresh_Failed": "Load Failed",
     "Refresh_Failed_Message": "Failed to load lineage data",
+    "Expand_Failed": "Expand Failed",
+    "Expand_Failed_Message": "Could not open expanded view",
+    "DetailSearch_Failed": "Search Panel Failed",
+    "DetailSearch_Failed_Message": "Could not open search panel",
 
     "Settings_Title": "Data Lineage Settings",
     "Settings_Tab_Connection": "Connection",
@@ -130,5 +140,11 @@
     "Settings_RememberFilters": "Remember Filters",
     "Settings_RememberFiltersDesc": "Save filter selections when closing the item",
     "Settings_DefaultTraceLevels": "Default Trace Levels",
-    "Settings_DefaultTraceLevelsDesc": "Right-click on a node triggers trace with these levels"
+    "Settings_DefaultTraceLevelsDesc": "Right-click on a node triggers trace with these levels",
+
+    "Settings_CacheManagement": "Cache",
+    "Settings_CacheManagementDesc": "Clear cached data to force fresh reload from database",
+    "Settings_ClearCache": "Clear All Cache",
+    "Settings_CacheCleared": "Cache Cleared",
+    "Settings_CacheClearedDesc": "All cached lineage data has been removed"
 }

@@ -118,8 +118,8 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase300,
+    color: tokens.colorNeutralForeground2,
   },
   footerActions: {
     display: 'flex',
@@ -249,33 +249,10 @@ export function DataLineageHelpPanel({ workloadClient }: DataLineageHelpPanelPro
             >
               Christian Wagner
             </Link>
-            <Text>- Data Architect & Engineer</Text>
           </div>
-          <div className={styles.footerRow}>
-            <Link
-              href="https://chwagneraltyca.github.io/fabric-datalineage/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Documentation
-            </Link>
-            <Text>|</Text>
-            <Link
-              href="https://chwagneraltyca.github.io/fabric-datalineage/QUICKSTART.html"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Quick Start
-            </Link>
-            <Text>|</Text>
-            <Link
-              href="https://claude.ai/code"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Built with Claude Code
-            </Link>
-          </div>
+          <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
+            {t('Help_BuiltWith')} Claude Code
+          </Text>
         </div>
         <div className={styles.footerActions}>
           <Button appearance="primary" onClick={handleClose}>
