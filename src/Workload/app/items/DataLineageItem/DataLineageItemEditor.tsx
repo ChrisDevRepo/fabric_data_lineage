@@ -626,10 +626,11 @@ export function DataLineageItemEditor(props: PageProps) {
 
     if (result.success) {
       setSaveStatus(SaveStatus.NotSaved);
+      const activeSource = sources.find(s => s.source_id === activeSourceId);
       callNotificationOpen(
         workloadClient,
         t('Refresh_Success'),
-        t('Refresh_Success_Message', { count: result.count }),
+        t('Refresh_Success_Message', { count: result.count, database: activeSource?.database_name || '' }),
         undefined,
         undefined
       );
@@ -642,7 +643,7 @@ export function DataLineageItemEditor(props: PageProps) {
         undefined
       );
     }
-  }, [loadLineageData, workloadClient, t]);
+  }, [loadLineageData, workloadClient, t, sources, activeSourceId]);
 
   // Retry handler - for when connection fails (skip cache, retry from scratch)
   const handleRetry = useCallback(async () => {
@@ -659,10 +660,10 @@ export function DataLineageItemEditor(props: PageProps) {
     }
   }, [graphControls]);
 
-  // Export to SVG handler (delegates to graph controls)
-  const handleExportImage = useCallback(() => {
+  // Export to image handler (delegates to graph controls)
+  const handleExportImage = useCallback((mode: 'currentView' | 'fitAll' = 'fitAll') => {
     if (graphControls) {
-      graphControls.exportToSvg();
+      graphControls.exportToImage(mode);
     }
   }, [graphControls]);
 
@@ -823,8 +824,9 @@ export function DataLineageItemEditor(props: PageProps) {
       }}
       dataModelTypes={currentDefinition.dataModelConfig?.types}
       onFilterChange={handleFilterChange}
+      isRefreshing={isLoadingData && lineageData.length > 0}
     />
-  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, lineageServiceRef, activeSourceId, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.dataModelConfig?.types, handleFilterChange]);
+  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, lineageServiceRef, activeSourceId, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.dataModelConfig?.types, handleFilterChange, isLoadingData]);
 
   // View registration - memoized to prevent unnecessary re-renders
   const views: RegisteredView[] = useMemo(() => [
