@@ -16,7 +16,6 @@ CR*.md
 build/
 dist/
 releases/
-*.nupkg
 
 # Dependencies
 node_modules/

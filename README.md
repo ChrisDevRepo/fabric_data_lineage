@@ -71,8 +71,7 @@ cd scripts && pwsh ./Run/StartDevServer.ps1
 
 | Document | Description |
 |----------|-------------|
-| [Quick Start](docs/QUICKSTART.md) | Try with demo mode |
-| [Admin Setup](docs/ADMIN_SETUP.md) | Enable workload in tenant (admin only) |
+| [Quick Start](docs/QUICKSTART.md) | Try demo, setup guide, admin steps |
 | [Setup Guide](setup/README.md) | Deploy database, pipeline, GraphQL |
 | [Features](docs/FEATURES.md) | Feature reference |
 | [DMV Queries](docs/DMV_QUERIES.md) | Data extraction queries |

@@ -4,7 +4,7 @@
 
 - Fabric workspace (Contributor+ permissions)
 - Fabric Data Warehouse to analyze
-- Workload enabled in your tenant (see [Admin Setup](../docs/ADMIN_SETUP.md))
+- Workload enabled in your tenant (see [Quick Start](../docs/QUICKSTART.md))
 
 ---
 
