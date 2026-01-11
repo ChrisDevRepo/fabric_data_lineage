@@ -84,7 +84,7 @@ Use `%` as wildcard: `staging%` (starts with), `%_temp` (ends with), `%test%` (c
 | Fit View | Auto-fit viewport |
 | Expand | Toggle fullscreen mode |
 | Detail Search | Full-text DDL search |
-| Export | PNG export |
+| Export | Save graph as image |
 | Help | Open help panel |
 | Database | Switch active source |
 

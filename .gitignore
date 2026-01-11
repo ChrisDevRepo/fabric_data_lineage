@@ -13,9 +13,10 @@ tools/
 CR*.md
 
 # Build
-build/
+/build/
+src/build/
 dist/
-*.nupkg
+releases/
 
 # Dependencies
 node_modules/

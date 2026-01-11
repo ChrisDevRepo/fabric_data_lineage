@@ -7,6 +7,8 @@ Microsoft Fabric workload for visualizing object-level data lineage across Fabri
 
 [Demo Video](https://www.youtube.com/watch?v=uZAk9PqHwJc) | [Documentation](docs/index.html) | [Quick Start](#quick-start)
 
+![Data Lineage Graph](docs/images/data-lineage-gui.png)
+
 ## Features
 
 - **Interactive Graph** - Pan, zoom, highlight. Nodes colored by schema, shaped by type.
@@ -14,7 +16,7 @@ Microsoft Fabric workload for visualizing object-level data lineage across Fabri
 - **DDL Search** - Full-text search with syntax-highlighted viewer.
 - **Multi-Database** - Switch between source DWHs. Single deployment.
 - **Filtering** - Schema, type, data model classification, exclude patterns.
-- **Export** - PNG for documentation.
+- **Export** - Save graph as image.
 
 ## Architecture
 
@@ -41,9 +43,10 @@ Source DWH → Copy Activity (Pipeline) → raw.* tables → Notebook → meta.*
 setup/                             # Deployment assets
 ├── schema-ddl.sql                 # Database schema (DDL)
 ├── LineageParser.ipynb            # DDL parsing notebook
-└── CopyLineageData.DataPipeline/  # Copy pipeline template
+└── pipeline_datalineage.zip       # Copy pipeline template (import in Fabric)
 src/Workload/                      # React frontend (Fabric SDK)
 └── app/items/DataLineageItem/     # Main visualization
+    └── ...
 docs/                              # User documentation
 scripts/                           # Build and deployment
 ```
@@ -68,8 +71,7 @@ cd scripts && pwsh ./Run/StartDevServer.ps1
 
 | Document | Description |
 |----------|-------------|
-| [Quick Start](docs/QUICKSTART.md) | Try with demo mode |
-| [Admin Setup](docs/ADMIN_SETUP.md) | Enable workload in tenant (admin only) |
+| [Quick Start](docs/QUICKSTART.md) | Try demo, setup guide, admin steps |
 | [Setup Guide](setup/README.md) | Deploy database, pipeline, GraphQL |
 | [Features](docs/FEATURES.md) | Feature reference |
 | [DMV Queries](docs/DMV_QUERIES.md) | Data extraction queries |

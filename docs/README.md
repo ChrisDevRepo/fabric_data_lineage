@@ -11,7 +11,7 @@
 
 | File | Description |
 |------|-------------|
-| [ADMIN_SETUP.md](ADMIN_SETUP.md) | Deploy workload to your tenant |
+| [QUICKSTART.md](QUICKSTART.md) | Admin setup steps (section 1) |
 | [../setup/README.md](../setup/README.md) | Set up database, pipeline, GraphQL |
 
 ## Reference

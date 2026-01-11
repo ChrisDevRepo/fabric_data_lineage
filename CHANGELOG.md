@@ -8,26 +8,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [1.3.3] - 2026-01-11
 
 ### Fixed
-- Prod/dev environments no longer share cached data
-- Detail Search opens as panel (no empty window in dev mode), focuses selected node on close
-- Database dropdown shows spinner while switching
-- Test connection button shows retry progress (1/3, 2/3, 3/3)
-- Fixed edges rendering to non-existent nodes when filters applied
+- Cache isolation between production and development environments
+- Detail Search now opens reliably and focuses the selected node on close
+- Database switching shows loading indicator
+- Connection test shows retry progress
 
 ### Changed
-- Export dialog with PNG/JPEG formats, legend toggle, and high-res (2x) options
-- Removed ReactFlow attribution link
-- Refresh notification shows database name instead of "GraphQL"
-- "Clear Cache" moved from Preferences to Connection tab
-- Centered loading overlay for all refresh/loading states (consistent UX)
-- Help panel footer simplified
-- Filter settings now use 2-tier storage: localStorage for session (24h), explicit Save for team defaults
-- DDLViewerPanel refactored to use shared DDLViewer component (reduced code duplication)
-- Detail Search filters synced from editor via sessionStorage (Schema/Types dropdowns match main toolbar)
+- Export dialog: PNG/JPEG formats, optional legend, high-resolution (2x) option
+- Refresh notification shows database name
+- "Clear Cache" moved to Connection settings
+- Detail Search filters stay in sync with main toolbar
+- Simplified help panel
 
 ### Added
-- Spinner accessibility labels (aria-label)
-- Offline database switching (dropdown and graph data cached for temporary outages)
+- Offline database switching (cached data available during outages)
 
 ## [1.3.2] - 2026-01-09
 
