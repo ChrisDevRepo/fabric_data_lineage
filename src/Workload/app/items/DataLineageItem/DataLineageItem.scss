@@ -219,6 +219,7 @@
   }
 
   // Centered loading overlay for refresh/loading states
+  // Uses Fabric token for theme-aware background (not OS prefers-color-scheme)
   &__loading-overlay {
     position: absolute;
     top: 0;
@@ -228,13 +229,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--colorNeutralBackground1);
+    opacity: 0.85;
     z-index: 100;
-
-    // Dark mode support
-    @media (prefers-color-scheme: dark) {
-      background: rgba(0, 0, 0, 0.5);
-    }
   }
 
   &__stats {
@@ -934,6 +931,16 @@
   width: 100%;
   background: var(--colorNeutralBackground1);
   overflow: hidden;
+
+  // Overlay mode - renders as full-screen overlay on top of editor
+  &--overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+  }
 
   // Header with search bar and filters
   &__header {

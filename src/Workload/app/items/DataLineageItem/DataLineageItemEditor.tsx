@@ -23,7 +23,7 @@ import {
 } from '../../controller/ItemCRUDController';
 import { callNotificationOpen } from '../../controller/NotificationController';
 import { callPageOpen } from '../../controller/PageController';
-import { callPanelOpen, callSettingsPanelOpen, callSearchPanelOpen, resetPanelStack } from '../../controller/PanelController';
+import { callPanelOpen, callSettingsPanelOpen } from '../../controller/PanelController';
 import { ItemEditor, RegisteredView } from '../../components/ItemEditor';
 
 import {
@@ -42,7 +42,7 @@ import {
   DEFAULT_RETRY_CONFIG,
   VwSource,
 } from './LineageService';
-import { PENDING_FOCUS_NODE_KEY, SEARCH_FILTERS_KEY } from './DataLineageSearchPage';
+import { DataLineageSearchOverlay, SearchOverlayFilters } from './DataLineageSearchOverlay';
 import { createCacheService, LineageCacheService } from './LineageCacheService';
 import { FilterCacheService } from './FilterCacheService';
 import { DataNode, ObjectType, ExternalRefType } from './types';
@@ -106,6 +106,9 @@ export function DataLineageItemEditor(props: PageProps) {
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [hasAttemptedLoadSources, setHasAttemptedLoadSources] = useState(false); // Prevents infinite loop on API failure
   const [activeSourceId, setActiveSourceId] = useState<number | undefined>();
+
+  // Search overlay state (component-based, no Fabric panel API)
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
 
   // Memoized LineageService for on-demand DDL loading (passed to DefaultView)
   const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
@@ -270,7 +273,6 @@ export function DataLineageItemEditor(props: PageProps) {
     }
 
     const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
-    const itemId = pageContext.itemObjectId || 'demo';
     setIsLoadingSources(true);
 
     try {
@@ -283,9 +285,6 @@ export function DataLineageItemEditor(props: PageProps) {
       );
 
       setSources(sortedSources);
-
-      // Cache sources for offline dropdown
-      LineageCacheService.setCachedSources(itemId, sortedSources);
 
       // Find the active source (is_active = true)
       const activeSource = sortedSources.find(s => s.is_active);
@@ -302,17 +301,11 @@ export function DataLineageItemEditor(props: PageProps) {
       }
     } catch (error) {
       console.error('Failed to load sources:', error);
-      // Fallback: try cached sources when GraphQL fails
-      const cachedSources = LineageCacheService.getCachedSources(itemId);
-      if (cachedSources && cachedSources.length > 0) {
-        setSources(cachedSources);
-        const activeSource = cachedSources.find(s => s.is_active);
-        setActiveSourceId(activeSource?.source_id);
-      }
+      // No fallback - sources require fresh GraphQL data for consistency
     } finally {
       setIsLoadingSources(false);
     }
-  }, [workloadClient, currentDefinition.graphqlEndpoint, currentDefinition.useSampleData, pageContext.itemObjectId]);
+  }, [workloadClient, currentDefinition.graphqlEndpoint, currentDefinition.useSampleData]);
 
   // Handle database change from dropdown
   // CRITICAL: Server update MUST succeed before UI changes to keep dropdown/graph in sync
@@ -732,18 +725,16 @@ export function DataLineageItemEditor(props: PageProps) {
     }
   }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition, t]);
 
-  // Detail Search handler - opens search panel using Fabric's panel.open API
-  // Syncs current filter state to search panel via sessionStorage
-  const handleDetailSearch = useCallback(async () => {
-    const workloadName = process.env.WORKLOAD_NAME || 'Org.DataLineage';
-    const itemId = pageContext.itemObjectId || 'demo';
-    const searchPath = `/DataLineageItem-search/${itemId}`;
+  // Detail Search handler - opens search overlay (simple component state)
+  // No Fabric panel API, no routing, no URL changes - just like DDLViewerPanel
+  const handleDetailSearch = useCallback(() => {
+    // Fire-and-forget warmup: wake up GraphQL endpoint before overlay opens
+    lineageServiceRef?.testConnection().catch(() => {});
+    setShowSearchOverlay(true);
+  }, [lineageServiceRef]);
 
-    // Reset panel stack before opening to prevent the second-open bug
-    // where Fabric falls back to opening a new window with production URL
-    await resetPanelStack(workloadClient);
-
-    // Sync filter state to search panel (avoids API call + matches editor selection)
+  // Compute search filters for overlay (memoized to avoid recalculation)
+  const searchOverlayFilters = useMemo((): SearchOverlayFilters => {
     // Match useLineageFilters logic: exclude external objects (they have schema='')
     const schemas = [...new Set(
       lineageData
@@ -751,31 +742,28 @@ export function DataLineageItemEditor(props: PageProps) {
         .map(n => n.schema)
     )].sort();
     // Filter selected schemas to exclude empty/whitespace values
-    const filteredSelectedSchemas = currentDefinition.selectedSchemas?.filter(s => s && s.trim().length > 0);
-    sessionStorage.setItem(SEARCH_FILTERS_KEY, JSON.stringify({
+    const filteredSelectedSchemas = currentDefinition.selectedSchemas?.filter(s => s && s.trim().length > 0) || [];
+
+    return {
       schemas,
       selectedSchemas: filteredSelectedSchemas,
-      selectedTypes: currentDefinition.selectedObjectTypes,
-      graphqlEndpoint: currentDefinition.graphqlEndpoint,
-      activeSourceId,
-    }));
+      selectedTypes: currentDefinition.selectedObjectTypes || [],
+      sourceId: activeSourceId,
+    };
+  }, [lineageData, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, activeSourceId]);
 
-    // Fire-and-forget warmup: wake up GraphQL endpoint before panel opens
-    lineageServiceRef?.testConnection().catch(() => {});
+  // Handle search overlay close
+  const handleSearchOverlayClose = useCallback(() => {
+    setShowSearchOverlay(false);
+  }, []);
 
-    try {
-      await callSearchPanelOpen(workloadClient, workloadName, searchPath);
-    } catch (error) {
-      console.error('Failed to open search panel:', error);
-      callNotificationOpen(
-        workloadClient,
-        t('DetailSearch_Failed'),
-        t('DetailSearch_Failed_Message'),
-        NotificationType.Warning,
-        undefined
-      );
+  // Handle focus node from search overlay (called before close)
+  const handleSearchFocusNode = useCallback((nodeId: string) => {
+    if (graphControls) {
+      // Small delay to ensure overlay is closed before focusing
+      setTimeout(() => graphControls.focusNode(nodeId), 100);
     }
-  }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.graphqlEndpoint, activeSourceId, lineageServiceRef, t]);
+  }, [graphControls]);
 
   // Help handler - opens help panel using Fabric's panel.open API
   const handleHelp = useCallback(async () => {
@@ -935,23 +923,6 @@ export function DataLineageItemEditor(props: PageProps) {
     return () => clearTimeout(timeoutId);
   }, [search, graphControls, pathname, lineageData.length]);
 
-  // Check for pending focus node from search panel (sessionStorage)
-  useEffect(() => {
-    if (!graphControls) return undefined;
-
-    const checkPendingFocus = () => {
-      const nodeId = sessionStorage.getItem(PENDING_FOCUS_NODE_KEY);
-      if (nodeId) {
-        sessionStorage.removeItem(PENDING_FOCUS_NODE_KEY);
-        graphControls.focusNode(nodeId);
-      }
-    };
-
-    checkPendingFocus();
-    const interval = setInterval(checkPendingFocus, 300);
-    return () => clearInterval(interval);
-  }, [graphControls]);
-
   return (
     <>
       <ItemEditor
@@ -982,6 +953,15 @@ export function DataLineageItemEditor(props: PageProps) {
             setViewSetter(() => setView);
           }
         }}
+      />
+
+      {/* Search overlay - rendered as full-screen overlay, controlled by state */}
+      <DataLineageSearchOverlay
+        isOpen={showSearchOverlay}
+        onClose={handleSearchOverlayClose}
+        onFocusNode={handleSearchFocusNode}
+        service={lineageServiceRef}
+        filters={searchOverlayFilters}
       />
     </>
   );

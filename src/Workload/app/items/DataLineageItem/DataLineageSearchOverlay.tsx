@@ -1,16 +1,16 @@
 /**
- * DataLineageSearchPage Component
+ * DataLineageSearchOverlay Component
  *
- * Full-page DDL search with resizable split panels.
+ * Full-screen DDL search overlay with resizable split panels.
  * Top panel: Search results list
  * Bottom panel: Monaco editor with selected DDL
  *
- * Opened via panel.open() from ribbon button or context menu.
- * Uses full window width to simulate page experience while using reliable panel API.
+ * Rendered as a simple overlay controlled by isOpen prop.
+ * No Fabric panel API, no routing, no URL changes.
+ * Same pattern as DDLViewerPanel - just React state.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Button,
   Input,
@@ -29,11 +29,7 @@ import {
   Database24Regular,
   Code24Regular,
 } from '@fluentui/react-icons';
-import { PageProps } from '../../App';
-import { getWorkloadItem } from '../../controller/ItemCRUDController';
-import { callPanelCloseAndNavigateBack } from '../../controller/PanelController';
-import { createLineageService, SearchResult } from './LineageService';
-import { DataLineageItemDefinition, DEFAULT_DEFINITION, mergeWithDefaults } from './DataLineageItemDefinition';
+import { SearchResult, LineageService } from './LineageService';
 import { SearchResultsList } from './SearchResultsList';
 import { DDLViewer } from './DDLViewer';
 import {
@@ -43,17 +39,33 @@ import {
 } from './monacoConfig';
 import './DataLineageItem.scss';
 
-interface ContextProps {
-  itemObjectId: string;
+export interface SearchOverlayFilters {
+  schemas: string[];
+  selectedSchemas: string[];
+  selectedTypes: string[];
+  sourceId?: number;
 }
 
-// SessionStorage keys for panel-editor communication
-export const PENDING_FOCUS_NODE_KEY = 'datalineage:pendingFocusNode';
-export const SEARCH_FILTERS_KEY = 'datalineage:searchFilters';
+export interface DataLineageSearchOverlayProps {
+  /** Whether the overlay is visible */
+  isOpen: boolean;
+  /** Callback when user clicks back button */
+  onClose: () => void;
+  /** Callback when user wants to focus a node in the graph (optional) */
+  onFocusNode?: (nodeId: string) => void;
+  /** LineageService instance from editor */
+  service: LineageService | null;
+  /** Filter configuration from editor */
+  filters: SearchOverlayFilters;
+}
 
-export function DataLineageSearchPage({ workloadClient }: PageProps) {
-  const { itemObjectId } = useParams<ContextProps>();
-
+export function DataLineageSearchOverlay({
+  isOpen,
+  onClose,
+  onFocusNode,
+  service,
+  filters,
+}: DataLineageSearchOverlayProps) {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -62,91 +74,53 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Filter state
-  const [filtersReady, setFiltersReady] = useState(false);
+  // Filter state - initialized from props
   const [availableSchemas, setAvailableSchemas] = useState<string[]>([]);
   const [selectedSchemas, setSelectedSchemas] = useState<Set<string>>(new Set());
   const availableTypes = ['Table', 'View', 'Stored Procedure', 'Function'];
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(['Table', 'View', 'Stored Procedure', 'Function']));
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(availableTypes));
+  const [activeSourceId, setActiveSourceId] = useState<number | undefined>(undefined);
+  const [filtersReady, setFiltersReady] = useState(false);
 
   // Resizable panel state (percentage for results panel height)
   const [resultsPanelHeight, setResultsPanelHeight] = useState(DETAIL_SEARCH_HEIGHT_DEFAULT_PCT);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Service ref
-  const serviceRef = useRef<ReturnType<typeof createLineageService> | null>(null);
-
-  // Source ID from editor (for correct database context)
-  const [activeSourceId, setActiveSourceId] = useState<number | undefined>(undefined);
-
-  // Initialize service and load filters from editor
-  // Uses sessionStorage data passed from editor to avoid slow Fabric API calls
+  // Initialize filters from props when overlay opens
   useEffect(() => {
-    if (!workloadClient) return;
+    if (isOpen && filters) {
+      // Filter out empty schemas
+      const validSchemas = filters.schemas.filter(s => s && s.trim().length > 0);
+      setAvailableSchemas(validSchemas);
 
-    const initializeService = async () => {
-      try {
-        let graphqlEndpoint: string | undefined;
+      const validSelected = filters.selectedSchemas.filter(s => s && s.trim().length > 0);
+      setSelectedSchemas(new Set(validSelected.length > 0 ? validSelected : validSchemas));
 
-        // Try to get data from sessionStorage (passed by editor)
-        let schemasFromStorage: string[] | undefined;
-        let selectedSchemasFromStorage: string[] | undefined;
-        let selectedTypesFromStorage: string[] | undefined;
-        let sourceIdFromStorage: number | undefined;
-
-        const savedFilters = sessionStorage.getItem(SEARCH_FILTERS_KEY);
-        if (savedFilters) {
-          sessionStorage.removeItem(SEARCH_FILTERS_KEY);
-          const parsed = JSON.parse(savedFilters);
-          graphqlEndpoint = parsed.graphqlEndpoint;
-          schemasFromStorage = parsed.schemas;
-          selectedSchemasFromStorage = parsed.selectedSchemas;
-          selectedTypesFromStorage = parsed.selectedTypes;
-          sourceIdFromStorage = parsed.activeSourceId;
-        }
-
-        // Fallback: load from item definition if endpoint not in sessionStorage
-        if (!graphqlEndpoint && itemObjectId && itemObjectId !== 'demo') {
-          const loadedItem = await getWorkloadItem<DataLineageItemDefinition>(
-            workloadClient,
-            itemObjectId,
-            DEFAULT_DEFINITION
-          );
-          const definition = mergeWithDefaults(loadedItem.definition || {});
-          graphqlEndpoint = definition.graphqlEndpoint;
-        }
-
-        // Create service with endpoint
-        serviceRef.current = createLineageService(workloadClient, graphqlEndpoint);
-
-        // Set filters from editor (no fallback - must come from sessionStorage)
-        if (schemasFromStorage?.length) {
-          // Filter out empty schemas (external objects have schema='')
-          const filteredSchemas = schemasFromStorage.filter(s => s && s.trim().length > 0);
-          setAvailableSchemas(filteredSchemas);
-          const filteredSelected = selectedSchemasFromStorage?.filter(s => s && s.trim().length > 0);
-          setSelectedSchemas(new Set(filteredSelected?.length ? filteredSelected : filteredSchemas));
-        }
-        if (selectedTypesFromStorage?.length) {
-          setSelectedTypes(new Set(selectedTypesFromStorage));
-        }
-        if (sourceIdFromStorage !== undefined) {
-          setActiveSourceId(sourceIdFromStorage);
-        }
-        setFiltersReady(true);
-      } catch (err) {
-        console.error('Failed to initialize search service:', err);
-        setSearchError(err instanceof Error ? err.message : 'Failed to initialize search');
+      if (filters.selectedTypes.length > 0) {
+        setSelectedTypes(new Set(filters.selectedTypes));
       }
-    };
 
-    initializeService();
-  }, [workloadClient, itemObjectId]);
+      setActiveSourceId(filters.sourceId);
+      setFiltersReady(true);
+    }
+  }, [isOpen, filters]);
+
+  // Reset state when overlay closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setSubmittedQuery('');
+      setResults([]);
+      setSelectedResult(null);
+      setSearchError(null);
+      setFiltersReady(false);
+    }
+  }, [isOpen]);
 
   // Execute search
   const executeSearch = useCallback(async (query: string) => {
-    if (!query.trim() || !serviceRef.current) return;
+    if (!query.trim() || !service) return;
 
     setIsSearching(true);
     setSearchError(null);
@@ -161,7 +135,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
         ? [...selectedTypes].join(',')
         : undefined;
 
-      const searchResults = await serviceRef.current.searchDdl(
+      const searchResults = await service.searchDdl(
         query.trim(),
         schemasFilter,
         typesFilter,
@@ -184,7 +158,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     } finally {
       setIsSearching(false);
     }
-  }, [selectedSchemas, selectedTypes, availableSchemas.length, availableTypes.length, activeSourceId]);
+  }, [service, selectedSchemas, selectedTypes, availableSchemas.length, availableTypes.length, activeSourceId]);
 
   // Handle search submit (Enter key)
   const handleSearchSubmit = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -212,17 +186,14 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSelectedResult(result);
   }, []);
 
-  // Handle back navigation - close panel, navigate to editor, and optionally focus on selected node
-  const handleBack = useCallback(async () => {
-    // Store focus node in sessionStorage (editor checks this after panel closes)
-    if (selectedResult) {
+  // Handle back navigation - just close overlay and optionally focus node
+  const handleBack = useCallback(() => {
+    if (selectedResult && onFocusNode) {
       const nodeId = `${selectedResult.source_id}_${selectedResult.object_id}`;
-      sessionStorage.setItem(PENDING_FOCUS_NODE_KEY, nodeId);
+      onFocusNode(nodeId);
     }
-    // Close panel and navigate back to editor to reset URL state
-    // This prevents the second-open bug where Fabric falls back to production URL
-    await callPanelCloseAndNavigateBack(workloadClient, itemObjectId);
-  }, [workloadClient, selectedResult, itemObjectId]);
+    onClose();
+  }, [selectedResult, onFocusNode, onClose]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -307,8 +278,11 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSelectedTypes(new Set());
   }, []);
 
+  // Don't render if not open
+  if (!isOpen) return null;
+
   return (
-    <div className="data-lineage-search">
+    <div className="data-lineage-search data-lineage-search--overlay">
       {/* Header */}
       <div className="data-lineage-search__header">
         <div className="data-lineage-search__header-left">
@@ -477,4 +451,4 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   );
 }
 
-export default DataLineageSearchPage;
+export default DataLineageSearchOverlay;

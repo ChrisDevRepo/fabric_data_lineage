@@ -51,70 +51,10 @@ export async function callSettingsPanelOpen(
 }
 
 /**
- * Opens a full-width panel for search experience.
- * Uses full screen width to provide same visual as a page while using reliable panel.open API.
- * This works in dev mode where page.open may fail.
- */
-export async function callSearchPanelOpen(
-    workloadClient: WorkloadClientAPI,
-    workloadName: string,
-    path: string) {
-
-    await workloadClient.panel.open({
-        workloadName,
-        route: { path },
-        options: {
-            width: window.innerWidth,
-            isLightDismiss: false
-        }
-    });
-}
-
-/**
  * Calls the 'panel.close' function from the WorkloadClientAPI to close a panel.
  *
  * @param {WorkloadClientAPI} workloadClient - An instance of the WorkloadClientAPI.
  */
 export async function callPanelClose(workloadClient: WorkloadClientAPI) {
     await workloadClient.panel.close({ mode: CloseMode.PopOne });
-}
-
-/**
- * Closes the current panel and navigates back to the editor route.
- * This ensures proper URL reset and panel stack cleanup to prevent
- * the second-open bug where Fabric falls back to opening a new window.
- *
- * @param {WorkloadClientAPI} workloadClient - An instance of the WorkloadClientAPI.
- * @param {string} itemObjectId - The item ID to navigate back to.
- */
-export async function callPanelCloseAndNavigateBack(
-    workloadClient: WorkloadClientAPI,
-    itemObjectId: string) {
-
-    // Close all panels to ensure clean state (prevents panel stack corruption)
-    try {
-        await workloadClient.panel.close({ mode: CloseMode.ClearAll });
-    } catch (e) {
-        // Ignore errors - panel may already be closed
-        console.warn('Panel close warning:', e);
-    }
-
-    // Navigate back to editor route to reset URL state
-    // This prevents the URL from staying on /DataLineageItem-search/:id
-    const editorPath = `/DataLineageItem-editor/${itemObjectId}`;
-    await workloadClient.navigation.navigate('workload', { path: editorPath });
-}
-
-/**
- * Resets the panel stack before opening a new panel.
- * Call this before panel.open to prevent the second-open bug.
- *
- * @param {WorkloadClientAPI} workloadClient - An instance of the WorkloadClientAPI.
- */
-export async function resetPanelStack(workloadClient: WorkloadClientAPI) {
-    try {
-        await workloadClient.panel.close({ mode: CloseMode.ClearAll });
-    } catch (e) {
-        // Ignore - no panels to close
-    }
 }
