@@ -6,11 +6,6 @@ import { DataLineageItemEditor } from "./items/DataLineageItem";
 import { DataLineageItemExpandedView } from "./items/DataLineageItem/DataLineageItemExpandedView";
 import { DataLineageHelpPanel } from "./items/DataLineageItem/DataLineageHelpPanel";
 import { DataLineageSettingsPanel } from "./items/DataLineageItem/DataLineageSettingsPanel";
-// DataLineageSearchPage removed - now rendered as overlay component in Editor
-
-/*
-    Add your Item Editor in the Route section of the App function below
-*/
 
 interface AppProps {
     history: History;
@@ -72,8 +67,6 @@ export function App({ history, workloadClient }: AppProps) {
                 <DataLineageSettingsPanel
                     workloadClient={workloadClient} data-testid="DataLineageItem-settings" />
             </Route>
-
-            {/* Detail Search is now rendered as overlay in Editor - no route needed */}
         </Switch>
     </Router>;
 }
