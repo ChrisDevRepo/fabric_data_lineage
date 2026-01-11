@@ -2,6 +2,8 @@
 
 Object Dependency Visualization for Microsoft Fabric Data Warehouses.
 
+![Product Page](images/Product-Page.png)
+
 ---
 
 ## Overview
@@ -60,10 +62,10 @@ React Frontend (ReactFlow)
 - External file sources (OPENROWSET, COPY INTO from OneLake/Blob/ADLS)
 - Multi-database switching, DDL search, data model classification, export
 
-### Not Included (Current)
+### Not Included
 
 - Column-level lineage (object-level only)
-- Lakehouse delta table metadata (SQL analytics endpoint only)
+- Lakehouse delta table metadata (data warehouse only)
 
 ---
 

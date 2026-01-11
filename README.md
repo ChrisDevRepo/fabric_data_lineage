@@ -1,6 +1,6 @@
 # Fabric Data Lineage
 
-> **See what Fabric's native lineage can't show you** — object-level dependencies inside your Data Warehouse.
+> **Visualize object-level dependencies** inside your Fabric Data Warehouse — tables, views, stored procedures, and functions.
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Fabric Extensibility Toolkit](https://img.shields.io/badge/Built_with-Fabric_Extensibility_Toolkit-742774)](https://github.com/microsoft/fabric-extensibility-toolkit)
@@ -15,13 +15,11 @@
 
 ---
 
-## The Problem
+## Why This Tool
 
-Fabric shows **item-level** lineage: Pipeline → Warehouse → Report.
+Fabric provides **item-level** lineage: Pipeline → Warehouse → Report.
 
-But inside your warehouse? Hundreds of tables, views, stored procedures — all connected by SQL you can't visualize. Change one table and hope nothing breaks.
-
-**This tool fills the gap.** Trace dependencies across schemas, search DDL code, understand impact before you deploy.
+This tool goes deeper — inside your warehouse. Visualize how tables, views, and stored procedures connect. Trace dependencies across schemas, search DDL code, understand impact before you deploy.
 
 ---
 
@@ -32,9 +30,10 @@ But inside your warehouse? Hundreds of tables, views, stored procedures — all 
 | **Graph** | Interactive visualization | Pan, zoom, click. Nodes colored by schema, shaped by object type. |
 | **Trace** | Upstream/downstream | Right-click any object → trace N levels up or down. See what feeds it, what depends on it. |
 | **Search** | Full-text DDL search | Find every SP that references `dbo.Orders`. Syntax-highlighted viewer. |
-| **Filter** | Smart filtering | By schema, object type, data model layer. Focus on what matters. |
+| **Filter** | Smart filtering | By schema, object type, data model layer. |
+| **Focus** | Focus Schema | Star a schema to show only its direct neighbors. |
 | **Multi-DB** | Multiple warehouses | Switch sources with a dropdown. Track cross-database references. |
-| **Export** | Save as image | One click to PNG for documentation or reviews. |
+| **Export** | Save as image | Export to PNG or JPEG with optional legend and high resolution. |
 
 ---
 
@@ -96,5 +95,5 @@ release/                # Deployable package (.nupkg)
 ---
 
 <p align="center">
-  <sub>MIT License • Built with the <a href="https://github.com/microsoft/fabric-extensibility-toolkit">Microsoft Fabric Extensibility Toolkit</a> and <a href="https://claude.ai/claude-code">Claude Code</a></sub>
+  <sub>MIT License • Built with the <a href="https://github.com/microsoft/fabric-extensibility-toolkit">Microsoft Fabric Extensibility Toolkit</a> and <a href="https://github.com/anthropics/claude-code">Claude Code</a></sub>
 </p>
