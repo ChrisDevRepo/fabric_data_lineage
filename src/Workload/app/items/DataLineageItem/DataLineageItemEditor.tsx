@@ -315,25 +315,32 @@ export function DataLineageItemEditor(props: PageProps) {
   }, [workloadClient, currentDefinition.graphqlEndpoint, currentDefinition.useSampleData, pageContext.itemObjectId]);
 
   // Handle database change from dropdown
+  // CRITICAL: Server update MUST succeed before UI changes to keep dropdown/graph in sync
   const handleDatabaseChange = useCallback(async (sourceId: number) => {
     if (sourceId === activeSourceId) return; // No change
 
     const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
 
-    // Update cache services to new source FIRST (enables cached data loading)
-    cacheServiceRef.current?.setSourceId(sourceId);
-    filterCacheRef.current?.setSourceId(sourceId);
-
-    // Try to update server (but don't block offline switching)
+    // STEP 1: Update server FIRST - must succeed before changing UI
     try {
       const service = createLineageService(workloadClient, graphqlEndpoint);
       await service.setActiveSource(sourceId);
     } catch (e) {
-      console.warn('Could not update active source on server (offline mode):', e);
-      // Continue - will use cached data
+      // FAILED - don't update UI, show error, keep dropdown at current value
+      console.error('Failed to switch database:', e);
+      callNotificationOpen(
+        workloadClient,
+        t('Database_Change_Failed'),
+        t('Database_Change_Failed_Message'),
+        NotificationType.Error,
+        undefined
+      );
+      return; // EXIT - dropdown stays at previous value
     }
 
-    // Update local state
+    // STEP 2: Server succeeded - now safe to update UI
+    cacheServiceRef.current?.setSourceId(sourceId);
+    filterCacheRef.current?.setSourceId(sourceId);
     setActiveSourceId(sourceId);
 
     // Update sources to reflect new is_active state
@@ -357,7 +364,7 @@ export function DataLineageItemEditor(props: PageProps) {
 
     setCacheMetadata(null);
 
-    // Load data (will use cache if available for offline switching)
+    // STEP 3: Load data for new source
     const result = await loadLineageData();
 
     if (result.success) {
@@ -366,14 +373,6 @@ export function DataLineageItemEditor(props: PageProps) {
         t('Database_Changed'),
         t('Database_Changed_Message'),
         undefined,
-        undefined
-      );
-    } else {
-      callNotificationOpen(
-        workloadClient,
-        t('Database_Change_Failed'),
-        t('Database_Change_Failed_Message'),
-        NotificationType.Error,
         undefined
       );
     }
