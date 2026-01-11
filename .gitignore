@@ -15,6 +15,7 @@ CR*.md
 # Build
 build/
 dist/
+releases/
 *.nupkg
 
 # Dependencies

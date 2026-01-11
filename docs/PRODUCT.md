@@ -23,7 +23,7 @@ Fabric workload providing interactive graph visualization for analyzing object d
 | **DDL Search** | Full-text search with syntax-highlighted viewer. |
 | **Multi-Database** | Switch between source DWHs. Single deployment. |
 | **Filtering** | Schema, type, data model classification, exclude patterns. |
-| **Export** | PNG for documentation. |
+| **Export** | Save graph as image. |
 
 ---
 
