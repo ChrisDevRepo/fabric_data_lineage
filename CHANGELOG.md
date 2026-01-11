@@ -2,9 +2,6 @@
 
 All notable changes to this project are documented here.
 
-Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
-Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-
 ## [1.3.3] - 2026-01-11
 
 ### Fixed
@@ -16,20 +13,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 - Export dialog: PNG/JPEG formats, optional legend, high-resolution (2x) option
 - Refresh notification shows database name
-- "Clear Cache" moved to Connection settings
 - Detail Search filters stay in sync with main toolbar
-- Simplified help panel
 
 ### Added
+- "Clear Cache" to Connection settings
 - Offline database switching (cached data available during outages)
 
 ## [1.3.2] - 2026-01-09
 
 ### Changed
-- DDL loaded on-demand (only when viewing SQL) for faster initial graph load
+- DDL loaded on-demand
 - Database cache preserved when switching between sources
-- Added `staticwebapp.config.json` for SPA routing (fixes 404 on deep links)
-- Simplified Quick Start section on landing page (cleaner layout, less text)
+- Simplified Quick Start section on landing page
 
 ## [1.3.1] - 2026-01-03
 
@@ -39,25 +34,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 - "No data found" message when database is empty
-- `hasAttemptedLoadSources` flag to prevent API call loops
-- Troubleshooting section in setup docs
 
 ## [1.3.0] - 2026-01-02
 
 ### Added
 - External objects support (FILE, OTHER_DB, LINK reference types)
-- Negative object IDs for external references
 - External type filter in toolbar
-
-### Changed
-- Views now include `ref_type` and `ref_name` columns
 
 ## [1.2.0] - 2025-12-28
 
 ### Added
 - Database selector dropdown in ribbon
 - Multi-warehouse support via `meta.sources` table
-- `sp_set_active_source` stored procedure
 
 ## [1.1.0] - 2025-12-20
 

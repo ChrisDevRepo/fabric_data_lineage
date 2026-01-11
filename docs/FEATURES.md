@@ -1,5 +1,7 @@
 # Feature Reference
 
+![Data Lineage GUI](images/data-lineage-gui.png)
+
 ## Graph Visualization
 
 Interactive directed graph using ReactFlow with Dagre hierarchical layout.
@@ -18,7 +20,7 @@ Interactive directed graph using ReactFlow with Dagre hierarchical layout.
 - **Schema Colors** - Automatic coloring by schema
 - **Data Model Icons** - Diamond (Dim), Square (Fact), Circle (Other)
 - **External Objects** - Dashed border, link badge
-- **Legend** - Collapsible schema color legend (bottom-left)
+- **Legend** - Collapsible schema color legend
 
 ### Navigation
 
@@ -34,7 +36,7 @@ Interactive directed graph using ReactFlow with Dagre hierarchical layout.
 | Action | Effect |
 |--------|--------|
 | Click | Highlight node + neighbors |
-| Double-click | Quick trace (1 up, 1 down) |
+| Double-click | Quick trace (uses default levels from Settings) |
 | Right-click | Context menu: Trace, View SQL |
 | Background click | Reset highlighting |
 
@@ -42,27 +44,27 @@ Interactive directed graph using ReactFlow with Dagre hierarchical layout.
 
 | Method | Description |
 |--------|-------------|
-| Double-click | Quick trace: 1 level up/down |
+| Double-click | Quick trace (uses default levels from Settings) |
 | Right-click > Trace | Configure depth (0-99 or All) |
 
 ## Filtering
 
 | Filter | Location | Options |
 |--------|----------|---------|
-| Schema | Toolbar popover | Multi-select, Focus Schema |
+| Schema | Toolbar popover | Multi-select; star icon sets Focus Schema (shows only direct neighbors) |
 | Type | Toolbar popover | Table, View, SP, Function + Data Model types |
 | Hide Isolated | Toolbar toggle | Hides unconnected nodes |
-| Exclude Patterns | Settings | Hide matching objects (SQL LIKE syntax) |
+| Exclude Patterns | Settings | Hide matching objects |
 
 ### Pattern Syntax
 
-Use `%` as wildcard: `staging%` (starts with), `%_temp` (ends with), `%test%` (contains).
+Use `*` as wildcard: `staging*` (starts with), `*_temp` (ends with), `*test*` (contains).
 
 ## Search & DDL Viewer
 
 | Feature | Access |
 |---------|--------|
-| Toolbar Search | Real-time object name search |
+| Toolbar Search | Object name search |
 | Detail Search | Ribbon button, full-text DDL search |
 | View SQL | Right-click menu, Monaco editor |
 
@@ -92,6 +94,5 @@ Use `%` as wildcard: `staging%` (starts with), `%_temp` (ends with), `%test%` (c
 
 | Issue | Solution |
 |-------|----------|
-| Empty graph | Check GraphQL endpoint in Settings |
-| No edges | Run DDL parser pipeline |
-| Slow load | Expected for 500+ nodes |
+| No data | Check GraphQL endpoint in Settings, verify connection |
+| No edges | Run DDL parser pipeline, check Fabric DB |
