@@ -34,6 +34,8 @@ Your Fabric tenant admin must complete these steps:
    Admin Portal → Workloads → Upload workload
    Download: [`release/Org.DataLineage.1.3.3.nupkg`](../release/Org.DataLineage.1.3.3.nupkg)
 
+   > **v1.3.3** - Package now included in repo for easy demo setup
+
 ### User Setup (in Fabric)
 
 1. In Fabric: **+ New** → **Data Lineage** (under custom workloads)
