@@ -23,7 +23,7 @@ import {
 } from '../../controller/ItemCRUDController';
 import { callNotificationOpen } from '../../controller/NotificationController';
 import { callPageOpen } from '../../controller/PageController';
-import { callPanelOpen, callSettingsPanelOpen, callSearchPanelOpen } from '../../controller/PanelController';
+import { callPanelOpen, callSettingsPanelOpen, callSearchPanelOpen, resetPanelStack } from '../../controller/PanelController';
 import { ItemEditor, RegisteredView } from '../../components/ItemEditor';
 
 import {
@@ -740,18 +740,29 @@ export function DataLineageItemEditor(props: PageProps) {
     const itemId = pageContext.itemObjectId || 'demo';
     const searchPath = `/DataLineageItem-search/${itemId}`;
 
+    // Reset panel stack before opening to prevent the second-open bug
+    // where Fabric falls back to opening a new window with production URL
+    await resetPanelStack(workloadClient);
+
     // Sync filter state to search panel (avoids API call + matches editor selection)
     // Match useLineageFilters logic: exclude external objects (they have schema='')
     const schemas = [...new Set(
       lineageData
-        .filter(n => !n.is_external && n.schema)
+        .filter(n => !n.is_external && n.schema && n.schema.trim().length > 0)
         .map(n => n.schema)
     )].sort();
+    // Filter selected schemas to exclude empty/whitespace values
+    const filteredSelectedSchemas = currentDefinition.selectedSchemas?.filter(s => s && s.trim().length > 0);
     sessionStorage.setItem(SEARCH_FILTERS_KEY, JSON.stringify({
       schemas,
-      selectedSchemas: currentDefinition.selectedSchemas,
+      selectedSchemas: filteredSelectedSchemas,
       selectedTypes: currentDefinition.selectedObjectTypes,
+      graphqlEndpoint: currentDefinition.graphqlEndpoint,
+      activeSourceId,
     }));
+
+    // Fire-and-forget warmup: wake up GraphQL endpoint before panel opens
+    lineageServiceRef?.testConnection().catch(() => {});
 
     try {
       await callSearchPanelOpen(workloadClient, workloadName, searchPath);
@@ -765,7 +776,7 @@ export function DataLineageItemEditor(props: PageProps) {
         undefined
       );
     }
-  }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, t]);
+  }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.graphqlEndpoint, activeSourceId, lineageServiceRef, t]);
 
   // Help handler - opens help panel using Fabric's panel.open API
   const handleHelp = useCallback(async () => {
@@ -963,6 +974,7 @@ export function DataLineageItemEditor(props: PageProps) {
             activeSourceId={activeSourceId}
             onDatabaseChange={handleDatabaseChange}
             isLoadingSources={isLoadingSources}
+            isOfflineMode={currentDefinition.useSampleData || !currentDefinition.graphqlEndpoint}
           />
         )}
         views={views}

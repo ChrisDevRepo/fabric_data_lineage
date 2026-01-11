@@ -5,7 +5,8 @@
  * Top panel: Search results list
  * Bottom panel: Monaco editor with selected DDL
  *
- * Opened via page.open() from ribbon button or context menu.
+ * Opened via panel.open() from ribbon button or context menu.
+ * Uses full window width to simulate page experience while using reliable panel API.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
@@ -15,16 +16,22 @@ import {
   Input,
   Text,
   Tooltip,
+  Popover,
+  PopoverTrigger,
+  PopoverSurface,
+  Checkbox,
   tokens,
 } from '@fluentui/react-components';
 import {
   Search24Regular,
   Dismiss24Regular,
   ArrowLeft24Regular,
+  Database24Regular,
+  Code24Regular,
 } from '@fluentui/react-icons';
 import { PageProps } from '../../App';
 import { getWorkloadItem } from '../../controller/ItemCRUDController';
-import { callPanelClose } from '../../controller/PanelController';
+import { callPanelCloseAndNavigateBack } from '../../controller/PanelController';
 import { createLineageService, SearchResult } from './LineageService';
 import { DataLineageItemDefinition, DEFAULT_DEFINITION, mergeWithDefaults } from './DataLineageItemDefinition';
 import { SearchResultsList } from './SearchResultsList';
@@ -55,9 +62,12 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Filter state (synced from editor via sessionStorage)
-  const [selectedSchemas, setSelectedSchemas] = useState<string[] | undefined>(undefined);
-  const [selectedTypes, setSelectedTypes] = useState<string[] | undefined>(undefined);
+  // Filter state
+  const [filtersReady, setFiltersReady] = useState(false);
+  const [availableSchemas, setAvailableSchemas] = useState<string[]>([]);
+  const [selectedSchemas, setSelectedSchemas] = useState<Set<string>>(new Set());
+  const availableTypes = ['Table', 'View', 'Stored Procedure', 'Function'];
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(['Table', 'View', 'Stored Procedure', 'Function']));
 
   // Resizable panel state (percentage for results panel height)
   const [resultsPanelHeight, setResultsPanelHeight] = useState(DETAIL_SEARCH_HEIGHT_DEFAULT_PCT);
@@ -67,16 +77,37 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   // Service ref
   const serviceRef = useRef<ReturnType<typeof createLineageService> | null>(null);
 
+  // Source ID from editor (for correct database context)
+  const [activeSourceId, setActiveSourceId] = useState<number | undefined>(undefined);
+
   // Initialize service and load filters from editor
+  // Uses sessionStorage data passed from editor to avoid slow Fabric API calls
   useEffect(() => {
     if (!workloadClient) return;
 
     const initializeService = async () => {
       try {
-        // Load item definition to get GraphQL endpoint
         let graphqlEndpoint: string | undefined;
 
-        if (itemObjectId && itemObjectId !== 'demo') {
+        // Try to get data from sessionStorage (passed by editor)
+        let schemasFromStorage: string[] | undefined;
+        let selectedSchemasFromStorage: string[] | undefined;
+        let selectedTypesFromStorage: string[] | undefined;
+        let sourceIdFromStorage: number | undefined;
+
+        const savedFilters = sessionStorage.getItem(SEARCH_FILTERS_KEY);
+        if (savedFilters) {
+          sessionStorage.removeItem(SEARCH_FILTERS_KEY);
+          const parsed = JSON.parse(savedFilters);
+          graphqlEndpoint = parsed.graphqlEndpoint;
+          schemasFromStorage = parsed.schemas;
+          selectedSchemasFromStorage = parsed.selectedSchemas;
+          selectedTypesFromStorage = parsed.selectedTypes;
+          sourceIdFromStorage = parsed.activeSourceId;
+        }
+
+        // Fallback: load from item definition if endpoint not in sessionStorage
+        if (!graphqlEndpoint && itemObjectId && itemObjectId !== 'demo') {
           const loadedItem = await getWorkloadItem<DataLineageItemDefinition>(
             workloadClient,
             itemObjectId,
@@ -86,17 +117,24 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
           graphqlEndpoint = definition.graphqlEndpoint;
         }
 
-        // Create service with endpoint from item definition
+        // Create service with endpoint
         serviceRef.current = createLineageService(workloadClient, graphqlEndpoint);
 
-        // Load filters synced from editor (if available)
-        const savedFilters = sessionStorage.getItem(SEARCH_FILTERS_KEY);
-        if (savedFilters) {
-          sessionStorage.removeItem(SEARCH_FILTERS_KEY);
-          const { selectedSchemas: selSchemas, selectedTypes: selTypes } = JSON.parse(savedFilters);
-          if (selSchemas?.length) setSelectedSchemas(selSchemas);
-          if (selTypes?.length) setSelectedTypes(selTypes);
+        // Set filters from editor (no fallback - must come from sessionStorage)
+        if (schemasFromStorage?.length) {
+          // Filter out empty schemas (external objects have schema='')
+          const filteredSchemas = schemasFromStorage.filter(s => s && s.trim().length > 0);
+          setAvailableSchemas(filteredSchemas);
+          const filteredSelected = selectedSchemasFromStorage?.filter(s => s && s.trim().length > 0);
+          setSelectedSchemas(new Set(filteredSelected?.length ? filteredSelected : filteredSchemas));
         }
+        if (selectedTypesFromStorage?.length) {
+          setSelectedTypes(new Set(selectedTypesFromStorage));
+        }
+        if (sourceIdFromStorage !== undefined) {
+          setActiveSourceId(sourceIdFromStorage);
+        }
+        setFiltersReady(true);
       } catch (err) {
         console.error('Failed to initialize search service:', err);
         setSearchError(err instanceof Error ? err.message : 'Failed to initialize search');
@@ -115,14 +153,19 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSubmittedQuery(query);
 
     try {
-      // Pass filters from editor (undefined = search all)
-      const schemasFilter = selectedSchemas?.join(',');
-      const typesFilter = selectedTypes?.join(',');
+      // Convert Sets to comma-separated strings for API (undefined = search all)
+      const schemasFilter = selectedSchemas.size < availableSchemas.length
+        ? [...selectedSchemas].join(',')
+        : undefined;
+      const typesFilter = selectedTypes.size < availableTypes.length
+        ? [...selectedTypes].join(',')
+        : undefined;
 
       const searchResults = await serviceRef.current.searchDdl(
         query.trim(),
         schemasFilter,
-        typesFilter
+        typesFilter,
+        activeSourceId
       );
 
       setResults(searchResults);
@@ -141,7 +184,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     } finally {
       setIsSearching(false);
     }
-  }, [selectedSchemas, selectedTypes]);
+  }, [selectedSchemas, selectedTypes, availableSchemas.length, availableTypes.length, activeSourceId]);
 
   // Handle search submit (Enter key)
   const handleSearchSubmit = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -169,15 +212,17 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSelectedResult(result);
   }, []);
 
-  // Handle back navigation - close panel and optionally focus on selected node
+  // Handle back navigation - close panel, navigate to editor, and optionally focus on selected node
   const handleBack = useCallback(async () => {
     // Store focus node in sessionStorage (editor checks this after panel closes)
     if (selectedResult) {
       const nodeId = `${selectedResult.source_id}_${selectedResult.object_id}`;
       sessionStorage.setItem(PENDING_FOCUS_NODE_KEY, nodeId);
     }
-    await callPanelClose(workloadClient);
-  }, [workloadClient, selectedResult]);
+    // Close panel and navigate back to editor to reset URL state
+    // This prevents the second-open bug where Fabric falls back to production URL
+    await callPanelCloseAndNavigateBack(workloadClient, itemObjectId);
+  }, [workloadClient, selectedResult, itemObjectId]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -217,6 +262,50 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  // Schema filter toggle
+  const toggleSchema = useCallback((schema: string) => {
+    setSelectedSchemas(prev => {
+      const next = new Set(prev);
+      if (next.has(schema)) {
+        next.delete(schema);
+      } else {
+        next.add(schema);
+      }
+      return next;
+    });
+  }, []);
+
+  // Type filter toggle
+  const toggleType = useCallback((type: string) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
+
+  // Select all/none for schemas
+  const selectAllSchemas = useCallback(() => {
+    setSelectedSchemas(new Set(availableSchemas));
+  }, [availableSchemas]);
+
+  const selectNoSchemas = useCallback(() => {
+    setSelectedSchemas(new Set());
+  }, []);
+
+  // Select all/none for types
+  const selectAllTypes = useCallback(() => {
+    setSelectedTypes(new Set(availableTypes));
+  }, []);
+
+  const selectNoTypes = useCallback(() => {
+    setSelectedTypes(new Set());
+  }, []);
 
   return (
     <div className="data-lineage-search">
@@ -266,6 +355,70 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
               Search
             </Button>
           </div>
+
+          {/* Schema filter - only show when filters are loaded */}
+          {filtersReady && (
+            <Popover>
+              <PopoverTrigger>
+                <Tooltip content="Filter by schema" relationship="label">
+                  <Button appearance="subtle" icon={<Database24Regular />}>
+                    Schemas ({selectedSchemas.size}/{availableSchemas.length})
+                  </Button>
+                </Tooltip>
+              </PopoverTrigger>
+              <PopoverSurface className="data-lineage-search__filter-popover">
+                <div className="filter-popover-header">
+                  <Text weight="semibold">Schemas</Text>
+                  <div className="filter-popover-actions">
+                    <Button size="small" appearance="subtle" onClick={selectAllSchemas}>All</Button>
+                    <Button size="small" appearance="subtle" onClick={selectNoSchemas}>None</Button>
+                  </div>
+                </div>
+                <div className="filter-popover-list">
+                  {availableSchemas.map(schema => (
+                    <Checkbox
+                      key={schema}
+                      label={schema}
+                      checked={selectedSchemas.has(schema)}
+                      onChange={() => toggleSchema(schema)}
+                    />
+                  ))}
+                </div>
+              </PopoverSurface>
+            </Popover>
+          )}
+
+          {/* Type filter - only show when filters are loaded */}
+          {filtersReady && (
+            <Popover>
+              <PopoverTrigger>
+                <Tooltip content="Filter by object type" relationship="label">
+                  <Button appearance="subtle" icon={<Code24Regular />}>
+                    Types ({selectedTypes.size}/{availableTypes.length})
+                  </Button>
+                </Tooltip>
+              </PopoverTrigger>
+              <PopoverSurface className="data-lineage-search__filter-popover">
+                <div className="filter-popover-header">
+                  <Text weight="semibold">Object Types</Text>
+                  <div className="filter-popover-actions">
+                    <Button size="small" appearance="subtle" onClick={selectAllTypes}>All</Button>
+                    <Button size="small" appearance="subtle" onClick={selectNoTypes}>None</Button>
+                  </div>
+                </div>
+                <div className="filter-popover-list">
+                  {availableTypes.map(type => (
+                    <Checkbox
+                      key={type}
+                      label={type}
+                      checked={selectedTypes.has(type)}
+                      onChange={() => toggleType(type)}
+                    />
+                  ))}
+                </div>
+              </PopoverSurface>
+            </Popover>
+          )}
         </div>
 
         <div className="data-lineage-search__header-right">

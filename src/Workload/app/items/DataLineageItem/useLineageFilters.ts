@@ -114,7 +114,7 @@ export function useLineageFilters(
   const availableSchemas = useMemo(() => {
     const schemas = new Set(
       allNodes
-        .filter(n => !n.is_external && n.schema !== '')
+        .filter(n => !n.is_external && n.schema && n.schema.trim().length > 0)
         .map(n => n.schema)
     );
     return Array.from(schemas).sort();
