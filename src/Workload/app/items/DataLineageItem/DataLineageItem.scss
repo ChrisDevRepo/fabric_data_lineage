@@ -218,6 +218,22 @@
     }
   }
 
+  // Centered loading overlay for refresh/loading states
+  // Uses Fabric token for theme-aware background (not OS prefers-color-scheme)
+  &__loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--colorNeutralBackground1);
+    opacity: 0.85;
+    z-index: 100;
+  }
+
   &__stats {
     display: flex;
     gap: var(--spacingHorizontalL);
@@ -504,7 +520,7 @@
 
 // ============================================================================
 // Shared Filter Popover Styles
-// Used by: DataLineageSearchPage filter dropdowns
+// Used by: DataLineageSearchOverlay filter dropdowns
 // ============================================================================
 
 .filter-popover-header {
@@ -915,6 +931,16 @@
   width: 100%;
   background: var(--colorNeutralBackground1);
   overflow: hidden;
+
+  // Overlay mode - renders as full-screen overlay on top of editor
+  &--overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+  }
 
   // Header with search bar and filters
   &__header {

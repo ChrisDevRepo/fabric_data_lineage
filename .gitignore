@@ -47,3 +47,4 @@ setup/Deploy_DataLineage_Test.ipynb
 
 # DevGateway
 scripts/tools/DevGateway/
+swa-cli.config.json

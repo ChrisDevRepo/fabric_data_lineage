@@ -11,7 +11,7 @@
  * - Filter State: Current filter selections (session state)
  */
 
-import { ObjectType, TraceConfig } from './types';
+import { ObjectType, TraceConfig, ExternalRefType } from './types';
 
 /**
  * Available shape icons for data model types
@@ -110,10 +110,13 @@ export interface DataLineageItemDefinition {
   preferences?: UserPreferences;
 
   // ============================================
-  // FILTER STATE (session, optionally persisted)
+  // FILTER STATE (persisted to Fabric on explicit Save)
+  // Also cached in localStorage for session persistence
   // ============================================
   selectedSchemas?: string[];
   selectedObjectTypes?: ObjectType[];
+  selectedDataModelTypes?: string[];        // Data model type filter (Dimension, Fact, Other)
+  selectedExternalTypes?: ExternalRefType[]; // External object type filter (FILE, OTHER_DB, LINK)
 
   // ============================================
   // TRACE MODE (session state)

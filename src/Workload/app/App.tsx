@@ -6,11 +6,6 @@ import { DataLineageItemEditor } from "./items/DataLineageItem";
 import { DataLineageItemExpandedView } from "./items/DataLineageItem/DataLineageItemExpandedView";
 import { DataLineageHelpPanel } from "./items/DataLineageItem/DataLineageHelpPanel";
 import { DataLineageSettingsPanel } from "./items/DataLineageItem/DataLineageSettingsPanel";
-import { DataLineageSearchPage } from "./items/DataLineageItem/DataLineageSearchPage";
-
-/*
-    Add your Item Editor in the Route section of the App function below
-*/
 
 interface AppProps {
     history: History;
@@ -71,12 +66,6 @@ export function App({ history, workloadClient }: AppProps) {
             <Route path="/DataLineageItem-settings/:itemObjectId">
                 <DataLineageSettingsPanel
                     workloadClient={workloadClient} data-testid="DataLineageItem-settings" />
-            </Route>
-
-            {/* Detail Search page for Data Lineage (opened via page.open from Ribbon) */}
-            <Route path="/DataLineageItem-search/:itemObjectId">
-                <DataLineageSearchPage
-                    workloadClient={workloadClient} data-testid="DataLineageItem-search" />
             </Route>
         </Switch>
     </Router>;

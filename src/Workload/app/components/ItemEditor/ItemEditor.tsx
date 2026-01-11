@@ -102,7 +102,7 @@ export interface ViewContext {
  * ```
  * 
  * @property {ReactNode | Function} ribbon - The ribbon component (receives ViewContext)
- * @property {RegisteredNotification[] | Function} messageBar - Static messageBar registration or function (DEPRECATED: prefer array)
+ * @property {RegisteredNotification[]} messageBar - Static messageBar registration
  * @property {RegisteredView[]} views - Array of registered views with static definitions
  * @property {string | null | undefined} initialView - Name of the initial view to show (null/undefined = no view rendered until set)
  * @property {() => string | null | undefined} getInitialView - Function to determine initial view when loading completes (alternative to initialView)
@@ -113,8 +113,8 @@ export interface ViewContext {
 export interface ItemEditorPropsWithViews {
   /** The ribbon component - can be ReactNode or function receiving (ViewContext) */
   ribbon: ReactNode | ((context: ViewContext) => ReactNode);
-  /** Static messageBar registration or function (DEPRECATED: prefer array) */
-  messageBar?: RegisteredNotification[] | ((currentView: string) => ReactNode);
+  /** Static messageBar registration */
+  messageBar?: RegisteredNotification[];
   /** Array of registered views with static definitions */
   views: RegisteredView[];
   /** Name of the initial view to show (null/undefined = don't render content until set) */
@@ -415,36 +415,26 @@ export function ItemEditor(props: ItemEditorProps) {
     return ribbon;
   }, [props, viewContext]);
 
-  // Resolve notification (static registration or legacy function)
+  // Resolve notification from static registration
   const notificationContent = React.useMemo(() => {
     const notifications = props.messageBar;
-    
-    if (!notifications) {
+
+    if (!notifications || notifications.length === 0) {
       return null;
     }
-    
-    // Legacy function pattern support
-    if (typeof notifications === 'function') {
-      return notifications(currentView);
-    }
-    
-    // Static notification registration (preferred)
-    if (Array.isArray(notifications)) {
-      // Find notifications that should show in current view
-      const activeNotifications = notifications.filter(notification => {
-        // If showInViews is not specified, show in all views
-        if (!notification.showInViews || notification.showInViews.length === 0) {
-          return true;
-        }
-        // Check if current view is in the showInViews array
-        return notification.showInViews.includes(currentView);
-      });
-      
-      // Return the first active notification (can be enhanced to support multiple)
-      return activeNotifications.length > 0 ? activeNotifications[0].component : null;
-    }
-    
-    return null;
+
+    // Find notifications that should show in current view
+    const activeNotifications = notifications.filter(notification => {
+      // If showInViews is not specified, show in all views
+      if (!notification.showInViews || notification.showInViews.length === 0) {
+        return true;
+      }
+      // Check if current view is in the showInViews array
+      return notification.showInViews.includes(currentView);
+    });
+
+    // Return the first active notification (can be enhanced to support multiple)
+    return activeNotifications.length > 0 ? activeNotifications[0].component : null;
   }, [props.messageBar, currentView]);
 
   // Determine content from view registration

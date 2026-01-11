@@ -9,7 +9,7 @@
  *
  * Used by:
  * - DDLViewerPanel (side panel "View SQL")
- * - DataLineageSearchPage (full-text search)
+ * - DataLineageSearchOverlay (full-text search)
  */
 
 import { useState, useCallback, useRef } from 'react';

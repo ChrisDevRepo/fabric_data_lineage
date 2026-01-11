@@ -72,6 +72,7 @@ export class LineageCacheService {
 
   /**
    * Check if cached data exists and is valid
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   hasValidCache(endpoint?: string): boolean {
     try {
@@ -84,6 +85,11 @@ export class LineageCacheService {
       // Check endpoint match (if provided)
       if (endpoint && cached.endpoint !== endpoint) return false;
 
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return false;
+      }
+
       // Check TTL
       const ageMs = Date.now() - new Date(cached.timestamp).getTime();
       const ttlMs = this.ttlMinutes * 60 * 1000;
@@ -95,6 +101,7 @@ export class LineageCacheService {
 
   /**
    * Get cached data (returns null if no cache or expired)
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   get(endpoint?: string): DataNode[] | null {
     try {
@@ -110,6 +117,12 @@ export class LineageCacheService {
       // Check endpoint match (if provided)
       if (endpoint && cached.endpoint !== endpoint) return null;
 
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      // If cache has a sourceId but it doesn't match current, reject cache
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return null;
+      }
+
       // Return cached data regardless of age (stale-while-revalidate pattern)
       return cached.data;
     } catch {
@@ -119,11 +132,18 @@ export class LineageCacheService {
 
   /**
    * Get stale data even if expired (for fallback when fetch fails)
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   getStale(): DataNode[] | null {
     try {
       const cached = this.getRawCache();
       if (!cached || cached.version !== CACHE_VERSION) return null;
+
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return null;
+      }
+
       return cached.data;
     } catch {
       return null;

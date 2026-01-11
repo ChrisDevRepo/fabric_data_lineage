@@ -873,21 +873,32 @@ export class LineageService {
    */
   async getDdlForObject(objectId: number, sourceId?: number): Promise<string | null> {
     // Use getDefinitions to fetch single object's DDL
-    // This is more efficient than searchDdl for targeted fetches
-    const query = `
-      query GetDdlForObject($object_id: Int!, $source_id: Int) {
-        vw_definitions(filter: { object_id: { eq: $object_id }, source_id: { eq: $source_id } }, first: 1) {
-          items {
-            definition
+    // Build query dynamically - only include source_id filter if provided
+    // (passing null to eq filter means "WHERE source_id IS NULL" which matches nothing)
+    const query = sourceId !== undefined
+      ? `
+        query GetDdlForObject($object_id: Int!, $source_id: Int!) {
+          vw_definitions(filter: { object_id: { eq: $object_id }, source_id: { eq: $source_id } }, first: 1) {
+            items {
+              definition
+            }
           }
         }
-      }
-    `;
+      `
+      : `
+        query GetDdlForObject($object_id: Int!) {
+          vw_definitions(filter: { object_id: { eq: $object_id } }, first: 1) {
+            items {
+              definition
+            }
+          }
+        }
+      `;
 
-    const variables = {
-      object_id: objectId,
-      source_id: sourceId ?? null,
-    };
+    const variables: Record<string, number> = { object_id: objectId };
+    if (sourceId !== undefined) {
+      variables.source_id = sourceId;
+    }
 
     const result = await this.executeQuery<{
       vw_definitions: { items: Array<{ definition: string | null }> };

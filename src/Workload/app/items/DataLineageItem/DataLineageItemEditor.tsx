@@ -42,9 +42,12 @@ import {
   DEFAULT_RETRY_CONFIG,
   VwSource,
 } from './LineageService';
+import { DataLineageSearchOverlay, SearchOverlayFilters } from './DataLineageSearchOverlay';
 import { createCacheService, LineageCacheService } from './LineageCacheService';
-import { DataNode, ObjectType } from './types';
+import { FilterCacheService } from './FilterCacheService';
+import { DataNode, ObjectType, ExternalRefType } from './types';
 import { fetchDemoData, DEMO_SOURCE } from './demoDataService';
+import type { ExportSettings } from './exportUtils';
 
 import './DataLineageItem.scss';
 
@@ -75,8 +78,9 @@ export function DataLineageItemEditor(props: PageProps) {
   // Graph controls (passed from DefaultView via callback)
   const [graphControls, setGraphControls] = useState<GraphControls | undefined>();
 
-  // Debounce timer for filter persistence (avoid saving on every keystroke)
-  const filterSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Filter cache service for localStorage persistence (24h TTL)
+  // Personal "working view" that doesn't affect team defaults until explicit Save
+  const filterCacheRef = useRef<FilterCacheService | null>(null);
 
   // Refs to track latest values for debounced callbacks (avoid stale closures)
   const itemRef = useRef<ItemWithDefinition<DataLineageItemDefinition>>();
@@ -102,6 +106,9 @@ export function DataLineageItemEditor(props: PageProps) {
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [hasAttemptedLoadSources, setHasAttemptedLoadSources] = useState(false); // Prevents infinite loop on API failure
   const [activeSourceId, setActiveSourceId] = useState<number | undefined>();
+
+  // Search overlay state (component-based, no Fabric panel API)
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
 
   // Memoized LineageService for on-demand DDL loading (passed to DefaultView)
   const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
@@ -294,65 +301,71 @@ export function DataLineageItemEditor(props: PageProps) {
       }
     } catch (error) {
       console.error('Failed to load sources:', error);
-      // Don't block the app if sources fail to load - data will still load from active source
+      // No fallback - sources require fresh GraphQL data for consistency
     } finally {
       setIsLoadingSources(false);
     }
   }, [workloadClient, currentDefinition.graphqlEndpoint, currentDefinition.useSampleData]);
 
   // Handle database change from dropdown
+  // CRITICAL: Server update MUST succeed before UI changes to keep dropdown/graph in sync
   const handleDatabaseChange = useCallback(async (sourceId: number) => {
     if (sourceId === activeSourceId) return; // No change
 
     const graphqlEndpoint = currentDefinition.graphqlEndpoint || DEFAULT_GRAPHQL_ENDPOINT;
 
+    // STEP 1: Update server FIRST - must succeed before changing UI
     try {
-      // Call SP to update active source in database
       const service = createLineageService(workloadClient, graphqlEndpoint);
       await service.setActiveSource(sourceId);
-
-      // Update local state
-      setActiveSourceId(sourceId);
-
-      // Update sources to reflect new is_active state
-      setSources(prev => prev.map(s => ({
-        ...s,
-        is_active: s.source_id === sourceId,
-      })));
-
-      // Clear filters and reload data (views now filter by new active source)
-      setCurrentDefinition(prev => ({
-        ...prev,
-        selectedSchemas: undefined,
-        selectedObjectTypes: undefined,
-        preferences: {
-          ...prev.preferences,
-          focusSchema: null,
-        },
-      }));
-
-      // Clear cache and reload data
-      if (cacheServiceRef.current) {
-        cacheServiceRef.current.clear();
-      }
-      setCacheMetadata(null);
-
-      await loadLineageData(undefined, { skipCache: true });
-
-      callNotificationOpen(
-        workloadClient,
-        t('Database_Changed'),
-        t('Database_Changed_Message'),
-        undefined,
-        undefined
-      );
-    } catch (error) {
-      console.error('Failed to change database:', error);
+    } catch (e) {
+      // FAILED - don't update UI, show error, keep dropdown at current value
+      console.error('Failed to switch database:', e);
       callNotificationOpen(
         workloadClient,
         t('Database_Change_Failed'),
         t('Database_Change_Failed_Message'),
         NotificationType.Error,
+        undefined
+      );
+      return; // EXIT - dropdown stays at previous value
+    }
+
+    // STEP 2: Server succeeded - now safe to update UI
+    cacheServiceRef.current?.setSourceId(sourceId);
+    filterCacheRef.current?.setSourceId(sourceId);
+    setActiveSourceId(sourceId);
+
+    // Update sources to reflect new is_active state
+    setSources(prev => prev.map(s => ({
+      ...s,
+      is_active: s.source_id === sourceId,
+    })));
+
+    // Clear filters for new database
+    setCurrentDefinition(prev => ({
+      ...prev,
+      selectedSchemas: undefined,
+      selectedObjectTypes: undefined,
+      selectedDataModelTypes: undefined,
+      selectedExternalTypes: undefined,
+      preferences: {
+        ...prev.preferences,
+        focusSchema: null,
+      },
+    }));
+
+    setCacheMetadata(null);
+
+    // STEP 3: Load data for new source
+    const result = await loadLineageData();
+
+    if (result.success) {
+      callNotificationOpen(
+        workloadClient,
+        t('Database_Changed'),
+        t('Database_Changed_Message'),
+        undefined,
         undefined
       );
     }
@@ -363,12 +376,9 @@ export function DataLineageItemEditor(props: PageProps) {
   const reloadDefinition = useCallback(async () => {
     if (!pageContext.itemObjectId) return;
 
-    // CRITICAL: Cancel any pending filter save to prevent race condition
-    // The debounced save would use stale data and overwrite new settings
-    if (filterSaveTimerRef.current) {
-      clearTimeout(filterSaveTimerRef.current);
-      filterSaveTimerRef.current = null;
-    }
+    // Clear filter cache when reloading definition (e.g., settings changed)
+    // This ensures fresh state from Fabric
+    filterCacheRef.current?.clear();
 
     try {
       const loadedItem = await getWorkloadItem<DataLineageItemDefinition>(
@@ -429,6 +439,40 @@ export function DataLineageItemEditor(props: PageProps) {
         const mergedDefinition = mergeWithDefaults(loadedItem.definition || {});
         loadedItem.definition = mergedDefinition;
 
+        // Initialize filter cache service for this item
+        filterCacheRef.current = new FilterCacheService(pageContext.itemObjectId);
+
+        // Try to load cached filters from localStorage (personal working view)
+        // If cache exists, apply it over Fabric-loaded filters
+        const cachedFilters = filterCacheRef.current.get();
+        if (cachedFilters) {
+          // Apply cached filters - these are user's personal session state
+          if (cachedFilters.selectedSchemas) {
+            mergedDefinition.selectedSchemas = cachedFilters.selectedSchemas;
+          }
+          if (cachedFilters.selectedObjectTypes) {
+            mergedDefinition.selectedObjectTypes = cachedFilters.selectedObjectTypes;
+          }
+          if (cachedFilters.selectedDataModelTypes) {
+            mergedDefinition.selectedDataModelTypes = cachedFilters.selectedDataModelTypes;
+          }
+          if (cachedFilters.selectedExternalTypes) {
+            mergedDefinition.selectedExternalTypes = cachedFilters.selectedExternalTypes;
+          }
+          if (cachedFilters.focusSchema !== undefined) {
+            mergedDefinition.preferences = {
+              ...mergedDefinition.preferences,
+              focusSchema: cachedFilters.focusSchema,
+            };
+          }
+          if (cachedFilters.hideIsolated !== undefined) {
+            mergedDefinition.preferences = {
+              ...mergedDefinition.preferences,
+              hideIsolated: cachedFilters.hideIsolated,
+            };
+          }
+        }
+
         setSaveStatus(loadedItem.definition ? SaveStatus.Saved : SaveStatus.NotSaved);
         setItem(loadedItem);
         setCurrentDefinition(mergedDefinition);
@@ -457,7 +501,8 @@ export function DataLineageItemEditor(props: PageProps) {
     definitionRef.current = currentDefinition;
   }, [currentDefinition]);
 
-  // Save handler
+  // Save handler - persists current definition (including filters) to Fabric
+  // After save, localStorage cache is cleared since Fabric is now the source of truth
   const handleSave = useCallback(async () => {
     if (!item) return;
 
@@ -468,6 +513,10 @@ export function DataLineageItemEditor(props: PageProps) {
         ...item,
         definition: currentDefinition,
       });
+
+      // Clear localStorage cache - Fabric now has the latest filters
+      // Next page load will use Fabric values (which match current state)
+      filterCacheRef.current?.clear();
 
       setSaveStatus(SaveStatus.Saved);
       callNotificationOpen(
@@ -489,10 +538,13 @@ export function DataLineageItemEditor(props: PageProps) {
     }
   }, [item, currentDefinition, workloadClient, t]);
 
-  // Filter change handler - persists filter selections with debounce
+  // Filter change handler - saves to localStorage immediately (personal session state)
+  // User must click Save button to persist to Fabric (team-shared defaults)
   const handleFilterChange = useCallback((changes: {
     selectedSchemas?: string[];
     selectedObjectTypes?: ObjectType[];
+    selectedDataModelTypes?: string[];
+    selectedExternalTypes?: ExternalRefType[];
     focusSchema?: string | null;
     hideIsolated?: boolean;
   }) => {
@@ -503,6 +555,8 @@ export function DataLineageItemEditor(props: PageProps) {
       ...prev,
       selectedSchemas: changes.selectedSchemas ?? prev.selectedSchemas,
       selectedObjectTypes: changes.selectedObjectTypes ?? prev.selectedObjectTypes,
+      selectedDataModelTypes: changes.selectedDataModelTypes ?? prev.selectedDataModelTypes,
+      selectedExternalTypes: changes.selectedExternalTypes ?? prev.selectedExternalTypes,
       preferences: {
         ...prev.preferences,
         focusSchema: 'focusSchema' in changes ? changes.focusSchema : prev.preferences?.focusSchema,
@@ -510,50 +564,20 @@ export function DataLineageItemEditor(props: PageProps) {
       },
     }));
 
-    // Debounced auto-save (1.5s after last change)
-    if (filterSaveTimerRef.current) {
-      clearTimeout(filterSaveTimerRef.current);
-    }
+    // Save to localStorage immediately (personal session state, 24h TTL)
+    // This enables instant filter restoration on page refresh
+    filterCacheRef.current?.set({
+      selectedSchemas: changes.selectedSchemas,
+      selectedObjectTypes: changes.selectedObjectTypes,
+      selectedDataModelTypes: changes.selectedDataModelTypes,
+      selectedExternalTypes: changes.selectedExternalTypes,
+      focusSchema: changes.focusSchema,
+      hideIsolated: changes.hideIsolated,
+    });
 
-    filterSaveTimerRef.current = setTimeout(async () => {
-      // Use refs to get latest values (not stale closure values)
-      const latestItem = itemRef.current;
-      const latestDef = definitionRef.current;
-
-      if (!latestItem) return;
-
-      try {
-        // Build save payload using latest definition from ref
-        // Note: Use 'key in changes' check for focusSchema (null is valid value)
-        const savePayload = {
-          ...latestDef,
-          selectedSchemas: changes.selectedSchemas ?? latestDef.selectedSchemas,
-          selectedObjectTypes: changes.selectedObjectTypes ?? latestDef.selectedObjectTypes,
-          preferences: {
-            ...latestDef.preferences,
-            focusSchema: 'focusSchema' in changes ? changes.focusSchema : latestDef.preferences?.focusSchema,
-            hideIsolated: changes.hideIsolated ?? latestDef.preferences?.hideIsolated,
-          },
-        };
-
-        await saveWorkloadItem<DataLineageItemDefinition>(workloadClient, {
-          ...latestItem,
-          definition: savePayload,
-        });
-        setSaveStatus(SaveStatus.Saved);
-      } catch (error) {
-        console.error('Failed to auto-save filter preferences:', error);
-      }
-    }, 1500);
-  }, [workloadClient]);
-
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (filterSaveTimerRef.current) {
-        clearTimeout(filterSaveTimerRef.current);
-      }
-    };
+    // Mark as dirty to enable Save button
+    // User must click Save to persist to Fabric (team-shared defaults)
+    setSaveStatus(SaveStatus.NotSaved);
   }, []);
 
   // Check for settings saved flag (sessionStorage for cross-iframe communication)
@@ -626,10 +650,11 @@ export function DataLineageItemEditor(props: PageProps) {
 
     if (result.success) {
       setSaveStatus(SaveStatus.NotSaved);
+      const activeSource = sources.find(s => s.source_id === activeSourceId);
       callNotificationOpen(
         workloadClient,
         t('Refresh_Success'),
-        t('Refresh_Success_Message', { count: result.count }),
+        t('Refresh_Success_Message', { count: result.count, database: activeSource?.database_name || '' }),
         undefined,
         undefined
       );
@@ -642,7 +667,7 @@ export function DataLineageItemEditor(props: PageProps) {
         undefined
       );
     }
-  }, [loadLineageData, workloadClient, t]);
+  }, [loadLineageData, workloadClient, t, sources, activeSourceId]);
 
   // Retry handler - for when connection fails (skip cache, retry from scratch)
   const handleRetry = useCallback(async () => {
@@ -659,10 +684,10 @@ export function DataLineageItemEditor(props: PageProps) {
     }
   }, [graphControls]);
 
-  // Export to SVG handler (delegates to graph controls)
-  const handleExportImage = useCallback(() => {
+  // Export to image handler (delegates to graph controls)
+  const handleExportImage = useCallback((settings: ExportSettings) => {
     if (graphControls) {
-      graphControls.exportToSvg();
+      graphControls.exportToImage(settings);
     }
   }, [graphControls]);
 
@@ -690,28 +715,55 @@ export function DataLineageItemEditor(props: PageProps) {
       await callPageOpen(workloadClient, workloadName, expandedPath);
     } catch (error) {
       console.error('Failed to open expanded view:', error);
-      // Fallback: try window.open for cases where page.open doesn't work
-      // Requires sandbox relaxation (allow-popups) enabled in manifest
-      const expandedUrl = `${window.location.origin}/workloads/${workloadName}${expandedPath}`;
-      window.open(expandedUrl, '_blank', 'width=1600,height=900,menubar=no,toolbar=no');
+      callNotificationOpen(
+        workloadClient,
+        t('Expand_Failed'),
+        t('Expand_Failed_Message'),
+        NotificationType.Warning,
+        undefined
+      );
     }
-  }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition]);
+  }, [workloadClient, pageContext.itemObjectId, lineageData, currentDefinition, t]);
 
-  // Detail Search handler - opens search page using Fabric's page.open API
-  const handleDetailSearch = useCallback(async () => {
-    const workloadName = process.env.WORKLOAD_NAME || 'Org.DataLineage';
-    const itemId = pageContext.itemObjectId || 'demo';
-    const searchPath = `/DataLineageItem-search/${itemId}`;
+  // Detail Search handler - opens search overlay (simple component state)
+  // No Fabric panel API, no routing, no URL changes - just like DDLViewerPanel
+  const handleDetailSearch = useCallback(() => {
+    // Fire-and-forget warmup: wake up GraphQL endpoint before overlay opens
+    lineageServiceRef?.testConnection().catch(() => {});
+    setShowSearchOverlay(true);
+  }, [lineageServiceRef]);
 
-    try {
-      await callPageOpen(workloadClient, workloadName, searchPath);
-    } catch (error) {
-      console.error('Failed to open search page:', error);
-      // Fallback: try window.open
-      const searchUrl = `${window.location.origin}/workloads/${workloadName}${searchPath}`;
-      window.open(searchUrl, '_blank', 'width=1400,height=900,menubar=no,toolbar=no');
+  // Compute search filters for overlay (memoized to avoid recalculation)
+  const searchOverlayFilters = useMemo((): SearchOverlayFilters => {
+    // Match useLineageFilters logic: exclude external objects (they have schema='')
+    const schemas = [...new Set(
+      lineageData
+        .filter(n => !n.is_external && n.schema && n.schema.trim().length > 0)
+        .map(n => n.schema)
+    )].sort();
+    // Filter selected schemas to exclude empty/whitespace values
+    const filteredSelectedSchemas = currentDefinition.selectedSchemas?.filter(s => s && s.trim().length > 0) || [];
+
+    return {
+      schemas,
+      selectedSchemas: filteredSelectedSchemas,
+      selectedTypes: currentDefinition.selectedObjectTypes || [],
+      sourceId: activeSourceId,
+    };
+  }, [lineageData, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, activeSourceId]);
+
+  // Handle search overlay close
+  const handleSearchOverlayClose = useCallback(() => {
+    setShowSearchOverlay(false);
+  }, []);
+
+  // Handle focus node from search overlay (called before close)
+  const handleSearchFocusNode = useCallback((nodeId: string) => {
+    if (graphControls) {
+      // Small delay to ensure overlay is closed before focusing
+      setTimeout(() => graphControls.focusNode(nodeId), 100);
     }
-  }, [workloadClient, pageContext.itemObjectId]);
+  }, [graphControls]);
 
   // Help handler - opens help panel using Fabric's panel.open API
   const handleHelp = useCallback(async () => {
@@ -820,11 +872,14 @@ export function DataLineageItemEditor(props: PageProps) {
         ...currentDefinition.preferences,
         selectedSchemas: currentDefinition.selectedSchemas,
         selectedObjectTypes: currentDefinition.selectedObjectTypes,
+        selectedDataModelTypes: currentDefinition.selectedDataModelTypes,
+        selectedExternalTypes: currentDefinition.selectedExternalTypes,
       }}
       dataModelTypes={currentDefinition.dataModelConfig?.types}
       onFilterChange={handleFilterChange}
+      isRefreshing={isLoadingData && lineageData.length > 0}
     />
-  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, lineageServiceRef, activeSourceId, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.dataModelConfig?.types, handleFilterChange]);
+  ), [filteredData, lineageData.length, excludedCount, currentDefinition.useSampleData, lineageServiceRef, activeSourceId, handleControlsReady, currentDefinition.preferences, currentDefinition.selectedSchemas, currentDefinition.selectedObjectTypes, currentDefinition.selectedDataModelTypes, currentDefinition.selectedExternalTypes, currentDefinition.dataModelConfig?.types, handleFilterChange, isLoadingData]);
 
   // View registration - memoized to prevent unnecessary re-renders
   const views: RegisteredView[] = useMemo(() => [
@@ -847,7 +902,7 @@ export function DataLineageItemEditor(props: PageProps) {
     }
   }, [isLoading, viewSetter, lineageData.length]);
 
-  // Handle focusNode query parameter (from search page navigation)
+  // Handle focusNode query parameter (from search page navigation - legacy support)
   useEffect(() => {
     // Wait for graph controls AND data to be available
     if (!search || !graphControls || lineageData.length === 0) return undefined;
@@ -889,6 +944,7 @@ export function DataLineageItemEditor(props: PageProps) {
             activeSourceId={activeSourceId}
             onDatabaseChange={handleDatabaseChange}
             isLoadingSources={isLoadingSources}
+            isOfflineMode={currentDefinition.useSampleData || !currentDefinition.graphqlEndpoint}
           />
         )}
         views={views}
@@ -897,6 +953,15 @@ export function DataLineageItemEditor(props: PageProps) {
             setViewSetter(() => setView);
           }
         }}
+      />
+
+      {/* Search overlay - rendered as full-screen overlay, controlled by state */}
+      <DataLineageSearchOverlay
+        isOpen={showSearchOverlay}
+        onClose={handleSearchOverlayClose}
+        onFocusNode={handleSearchFocusNode}
+        service={lineageServiceRef}
+        filters={searchOverlayFilters}
       />
     </>
   );

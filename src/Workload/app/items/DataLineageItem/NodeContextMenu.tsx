@@ -118,16 +118,18 @@ export function NodeContextMenu({
 
         <MenuDivider />
 
-        {/* Start Trace - always available */}
-        <MenuItem
-          icon={<BranchFork24Regular />}
-          onClick={() => {
-            onStartTrace();
-            onClose();
-          }}
-        >
-          {isTraceModeActive ? 'New trace from here' : 'Trace lineage from here'}
-        </MenuItem>
+        {/* Start Trace - only available when not in trace mode */}
+        {!isTraceModeActive && (
+          <MenuItem
+            icon={<BranchFork24Regular />}
+            onClick={() => {
+              onStartTrace();
+              onClose();
+            }}
+          >
+            Trace lineage from here
+          </MenuItem>
+        )}
 
         {/* Show SQL (if available) */}
         {hasSql && onShowSql && (

@@ -1,19 +1,14 @@
 /**
  * DDLViewerPanel Component
- * Displays SQL DDL definitions using Monaco Editor
- * Uses Fabric design tokens and FluentUI v9 components
- *
- * Uses shared Monaco config from monacoConfig.ts for consistency
- * with DDLViewer component used in DataLineageSearchPage.
+ * Side panel for viewing SQL DDL definitions.
+ * Uses shared DDLViewer component for Monaco Editor display.
  *
  * DDL is loaded on-demand via useDdlLoader hook (not pre-loaded).
  */
 
 import React, { useCallback, useRef, useEffect } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
 import {
   Button,
-  Spinner,
   Text,
   Tooltip,
   tokens,
@@ -23,9 +18,8 @@ import {
   Copy24Regular,
   DocumentSearch24Regular,
   Code24Regular,
-  ArrowClockwise24Regular,
 } from '@fluentui/react-icons';
-import { MONACO_EDITOR_OPTIONS } from './monacoConfig';
+import { DDLViewer } from './DDLViewer';
 import { useDdlLoader } from './useDdlLoader';
 import { LineageService } from './LineageService';
 
@@ -43,9 +37,11 @@ export interface DDLViewerPanelProps {
   onClose: () => void;
   service: LineageService | null;
   sourceId?: number;
+  /** Whether demo mode is active (shows "not available" message instead of loading DDL) */
+  isDemo?: boolean;
 }
 
-export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDLViewerPanelProps) {
+export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId, isDemo = false }: DDLViewerPanelProps) {
   const editorRef = useRef<any>(null);
   const { ddlText, isLoading, error, loadDdl, retry, clear } = useDdlLoader(service);
 
@@ -60,14 +56,9 @@ export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDL
     }
   }, [isOpen, node?.objectId, sourceId, service, loadDdl, clear]);
 
-  // Handle editor mount - store reference for search functionality
-  const handleEditorMount: OnMount = useCallback((editor, monaco) => {
+  // Store editor reference when DDLViewer mounts Monaco
+  const handleEditorReady = useCallback((editor: any) => {
     editorRef.current = editor;
-
-    // Configure find widget to open with Ctrl+F
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
-      editor.getAction('actions.find')?.run();
-    });
   }, []);
 
   // Copy DDL to clipboard
@@ -75,7 +66,6 @@ export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDL
     if (ddlText) {
       try {
         await navigator.clipboard.writeText(ddlText);
-        // Could add notification here via Fabric SDK
       } catch (err) {
         console.error('Failed to copy DDL:', err);
       }
@@ -143,7 +133,7 @@ export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDL
       {/* Content */}
       <div className="ddl-viewer-panel__content">
         {!node ? (
-          // No node selected
+          // No node selected - panel-specific message
           <div className="ddl-viewer-panel__empty">
             <Code24Regular style={{ fontSize: 48, color: tokens.colorNeutralForeground4 }} />
             <Text size={400} style={{ color: tokens.colorNeutralForeground2 }}>
@@ -153,57 +143,29 @@ export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDL
               Right-click a node and select "View DDL" to see its definition
             </Text>
           </div>
-        ) : isLoading ? (
-          // Loading state
-          <div className="ddl-viewer-panel__empty">
-            <Spinner size="large" label="Loading DDL..." />
-          </div>
-        ) : error ? (
-          // Error state with retry
-          <div className="ddl-viewer-panel__empty">
-            <Code24Regular style={{ fontSize: 48, color: tokens.colorPaletteRedForeground1 }} />
-            <Text size={400} style={{ color: tokens.colorPaletteRedForeground1 }}>
-              Failed to load DDL
-            </Text>
-            <Text size={300} style={{ color: tokens.colorNeutralForeground3, textAlign: 'center' }}>
-              {error}
-            </Text>
-            <Button
-              appearance="primary"
-              icon={<ArrowClockwise24Regular />}
-              onClick={retry}
-              style={{ marginTop: tokens.spacingVerticalL }}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : !ddlText ? (
-          // Node selected but no DDL available
+        ) : isDemo ? (
+          // Demo mode - DDL not available
           <div className="ddl-viewer-panel__empty">
             <Code24Regular style={{ fontSize: 48, color: tokens.colorNeutralForeground4 }} />
             <Text size={400} style={{ color: tokens.colorNeutralForeground2 }}>
-              No DDL available
+              Not available in demo mode
             </Text>
             <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
-              {node.objectType === 'Table'
-                ? 'Tables do not have DDL definitions. Column metadata will be shown when available.'
-                : 'This object does not have a SQL definition in the dataset.'}
+              Connect to a GraphQL endpoint in Settings to view SQL definitions.
             </Text>
           </div>
         ) : (
-          // Monaco Editor with SQL highlighting
-          <Editor
-            height="100%"
-            language="sql"
-            theme="vs" // Light theme to match Fabric
-            value={ddlText}
-            onMount={handleEditorMount}
-            options={MONACO_EDITOR_OPTIONS}
-            loading={
-              <div className="ddl-viewer-panel__loading">
-                <Spinner size="medium" label="Loading editor..." />
-              </div>
-            }
+          // Use shared DDLViewer for loading/error/empty/editor states
+          <DDLViewer
+            ddlText={ddlText}
+            objectName={node.name}
+            objectType={node.objectType}
+            schemaName={node.schema}
+            isLoading={isLoading}
+            error={error}
+            onRetry={retry}
+            showHeader={false}
+            onEditorReady={handleEditorReady}
           />
         )}
       </div>

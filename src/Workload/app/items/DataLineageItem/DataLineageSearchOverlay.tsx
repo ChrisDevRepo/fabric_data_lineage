@@ -1,24 +1,25 @@
 /**
- * DataLineageSearchPage Component
+ * DataLineageSearchOverlay Component
  *
- * Full-page DDL search with resizable split panels.
+ * Full-screen DDL search overlay with resizable split panels.
  * Top panel: Search results list
  * Bottom panel: Monaco editor with selected DDL
  *
- * Opened via page.open() from ribbon button or context menu.
+ * Rendered as a simple overlay controlled by isOpen prop.
+ * No Fabric panel API, no routing, no URL changes.
+ * Same pattern as DDLViewerPanel - just React state.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
 import {
   Button,
   Input,
+  Text,
+  Tooltip,
   Popover,
   PopoverTrigger,
   PopoverSurface,
   Checkbox,
-  Text,
-  Tooltip,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -28,10 +29,7 @@ import {
   Database24Regular,
   Code24Regular,
 } from '@fluentui/react-icons';
-import { PageProps } from '../../App';
-import { getWorkloadItem } from '../../controller/ItemCRUDController';
-import { createLineageService, SearchResult } from './LineageService';
-import { DataLineageItemDefinition, DEFAULT_DEFINITION, mergeWithDefaults } from './DataLineageItemDefinition';
+import { SearchResult, LineageService } from './LineageService';
 import { SearchResultsList } from './SearchResultsList';
 import { DDLViewer } from './DDLViewer';
 import {
@@ -41,17 +39,33 @@ import {
 } from './monacoConfig';
 import './DataLineageItem.scss';
 
-interface ContextProps {
-  itemObjectId: string;
+export interface SearchOverlayFilters {
+  schemas: string[];
+  selectedSchemas: string[];
+  selectedTypes: string[];
+  sourceId?: number;
 }
 
-// Available object types for filtering (excluding Table as it has no DDL)
-const OBJECT_TYPES = ['View', 'Stored Procedure', 'Function'];
+export interface DataLineageSearchOverlayProps {
+  /** Whether the overlay is visible */
+  isOpen: boolean;
+  /** Callback when user clicks back button */
+  onClose: () => void;
+  /** Callback when user wants to focus a node in the graph (optional) */
+  onFocusNode?: (nodeId: string) => void;
+  /** LineageService instance from editor */
+  service: LineageService | null;
+  /** Filter configuration from editor */
+  filters: SearchOverlayFilters;
+}
 
-export function DataLineageSearchPage({ workloadClient }: PageProps) {
-  const { itemObjectId } = useParams<ContextProps>();
-  const history = useHistory();
-
+export function DataLineageSearchOverlay({
+  isOpen,
+  onClose,
+  onFocusNode,
+  service,
+  filters,
+}: DataLineageSearchOverlayProps) {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -60,78 +74,72 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Filter state
+  // Filter state - initialized from props
   const [availableSchemas, setAvailableSchemas] = useState<string[]>([]);
   const [selectedSchemas, setSelectedSchemas] = useState<Set<string>>(new Set());
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(OBJECT_TYPES));
+  const availableTypes = ['Table', 'View', 'Stored Procedure', 'Function'];
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(availableTypes));
+  const [activeSourceId, setActiveSourceId] = useState<number | undefined>(undefined);
+  const [filtersReady, setFiltersReady] = useState(false);
 
   // Resizable panel state (percentage for results panel height)
   const [resultsPanelHeight, setResultsPanelHeight] = useState(DETAIL_SEARCH_HEIGHT_DEFAULT_PCT);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Service ref
-  const serviceRef = useRef<ReturnType<typeof createLineageService> | null>(null);
-
-  // Initialize service (load item definition to get endpoint) and load available schemas
+  // Initialize filters from props when overlay opens
   useEffect(() => {
-    if (!workloadClient) return;
+    if (isOpen && filters) {
+      // Filter out empty schemas
+      const validSchemas = filters.schemas.filter(s => s && s.trim().length > 0);
+      setAvailableSchemas(validSchemas);
 
-    const initializeService = async () => {
-      try {
-        // Load item definition to get GraphQL endpoint
-        let graphqlEndpoint: string | undefined;
+      const validSelected = filters.selectedSchemas.filter(s => s && s.trim().length > 0);
+      setSelectedSchemas(new Set(validSelected.length > 0 ? validSelected : validSchemas));
 
-        if (itemObjectId && itemObjectId !== 'demo') {
-          const loadedItem = await getWorkloadItem<DataLineageItemDefinition>(
-            workloadClient,
-            itemObjectId,
-            DEFAULT_DEFINITION
-          );
-          const definition = mergeWithDefaults(loadedItem.definition || {});
-          graphqlEndpoint = definition.graphqlEndpoint;
-        }
-
-        // Create service with endpoint from item definition
-        serviceRef.current = createLineageService(workloadClient, graphqlEndpoint);
-
-        // Warm-up: Fire-and-forget query to wake up SQL database
-        serviceRef.current.getSources().catch(() => {});
-
-        // Load schemas for filter dropdown
-        const objects = await serviceRef.current.getObjects();
-        const schemas = [...new Set(objects.map((o) => o.schema_name))].sort();
-        setAvailableSchemas(schemas);
-        setSelectedSchemas(new Set(schemas)); // Select all by default
-      } catch (err) {
-        console.error('Failed to initialize search service:', err);
-        setSearchError(err instanceof Error ? err.message : 'Failed to initialize search');
+      if (filters.selectedTypes.length > 0) {
+        setSelectedTypes(new Set(filters.selectedTypes));
       }
-    };
 
-    initializeService();
-  }, [workloadClient, itemObjectId]);
+      setActiveSourceId(filters.sourceId);
+      setFiltersReady(true);
+    }
+  }, [isOpen, filters]);
+
+  // Reset state when overlay closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setSubmittedQuery('');
+      setResults([]);
+      setSelectedResult(null);
+      setSearchError(null);
+      setFiltersReady(false);
+    }
+  }, [isOpen]);
 
   // Execute search
   const executeSearch = useCallback(async (query: string) => {
-    if (!query.trim() || !serviceRef.current) return;
+    if (!query.trim() || !service) return;
 
     setIsSearching(true);
     setSearchError(null);
     setSubmittedQuery(query);
 
     try {
+      // Convert Sets to comma-separated strings for API (undefined = search all)
       const schemasFilter = selectedSchemas.size < availableSchemas.length
         ? [...selectedSchemas].join(',')
         : undefined;
-      const typesFilter = selectedTypes.size < OBJECT_TYPES.length
+      const typesFilter = selectedTypes.size < availableTypes.length
         ? [...selectedTypes].join(',')
         : undefined;
 
-      const searchResults = await serviceRef.current.searchDdl(
+      const searchResults = await service.searchDdl(
         query.trim(),
         schemasFilter,
-        typesFilter
+        typesFilter,
+        activeSourceId
       );
 
       setResults(searchResults);
@@ -150,7 +158,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     } finally {
       setIsSearching(false);
     }
-  }, [selectedSchemas, selectedTypes, availableSchemas.length]);
+  }, [service, selectedSchemas, selectedTypes, availableSchemas.length, availableTypes.length, activeSourceId]);
 
   // Handle search submit (Enter key)
   const handleSearchSubmit = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -178,23 +186,14 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
     setSelectedResult(result);
   }, []);
 
-  // Handle back navigation - navigate to editor with focusNode param if object selected
+  // Handle back navigation - just close overlay and optionally focus node
   const handleBack = useCallback(() => {
-    if (!itemObjectId) {
-      console.error('Cannot navigate back: itemObjectId is missing from route');
-      return;
-    }
-
-    const editorPath = `/DataLineageItem-editor/${itemObjectId}`;
-
-    if (selectedResult) {
-      // Build node ID in the format used by ReactFlow: {source_id}_{object_id}
+    if (selectedResult && onFocusNode) {
       const nodeId = `${selectedResult.source_id}_${selectedResult.object_id}`;
-      history.push(`${editorPath}?focusNode=${encodeURIComponent(nodeId)}`);
-    } else {
-      history.push(editorPath);
+      onFocusNode(nodeId);
     }
-  }, [history, itemObjectId, selectedResult]);
+    onClose();
+  }, [selectedResult, onFocusNode, onClose]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -237,7 +236,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
 
   // Schema filter toggle
   const toggleSchema = useCallback((schema: string) => {
-    setSelectedSchemas((prev) => {
+    setSelectedSchemas(prev => {
       const next = new Set(prev);
       if (next.has(schema)) {
         next.delete(schema);
@@ -250,7 +249,7 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
 
   // Type filter toggle
   const toggleType = useCallback((type: string) => {
-    setSelectedTypes((prev) => {
+    setSelectedTypes(prev => {
       const next = new Set(prev);
       if (next.has(type)) {
         next.delete(type);
@@ -272,15 +271,18 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
 
   // Select all/none for types
   const selectAllTypes = useCallback(() => {
-    setSelectedTypes(new Set(OBJECT_TYPES));
+    setSelectedTypes(new Set(availableTypes));
   }, []);
 
   const selectNoTypes = useCallback(() => {
     setSelectedTypes(new Set());
   }, []);
 
+  // Don't render if not open
+  if (!isOpen) return null;
+
   return (
-    <div className="data-lineage-search">
+    <div className="data-lineage-search data-lineage-search--overlay">
       {/* Header */}
       <div className="data-lineage-search__header">
         <div className="data-lineage-search__header-left">
@@ -328,79 +330,69 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
             </Button>
           </div>
 
-          {/* Schema filter */}
-          <Popover>
-            <PopoverTrigger>
-              <Tooltip content="Filter by schema" relationship="label">
-                <Button
-                  appearance="subtle"
-                  icon={<Database24Regular />}
-                >
-                  Schemas ({selectedSchemas.size}/{availableSchemas.length})
-                </Button>
-              </Tooltip>
-            </PopoverTrigger>
-            <PopoverSurface className="data-lineage-search__filter-popover">
-              <div className="filter-popover-header">
-                <Text weight="semibold">Schemas</Text>
-                <div className="filter-popover-actions">
-                  <Button size="small" appearance="subtle" onClick={selectAllSchemas}>
-                    All
+          {/* Schema filter - only show when filters are loaded */}
+          {filtersReady && (
+            <Popover>
+              <PopoverTrigger>
+                <Tooltip content="Filter by schema" relationship="label">
+                  <Button appearance="subtle" icon={<Database24Regular />}>
+                    Schemas ({selectedSchemas.size}/{availableSchemas.length})
                   </Button>
-                  <Button size="small" appearance="subtle" onClick={selectNoSchemas}>
-                    None
-                  </Button>
+                </Tooltip>
+              </PopoverTrigger>
+              <PopoverSurface className="data-lineage-search__filter-popover">
+                <div className="filter-popover-header">
+                  <Text weight="semibold">Schemas</Text>
+                  <div className="filter-popover-actions">
+                    <Button size="small" appearance="subtle" onClick={selectAllSchemas}>All</Button>
+                    <Button size="small" appearance="subtle" onClick={selectNoSchemas}>None</Button>
+                  </div>
                 </div>
-              </div>
-              <div className="filter-popover-list">
-                {availableSchemas.map((schema) => (
-                  <Checkbox
-                    key={schema}
-                    label={schema}
-                    checked={selectedSchemas.has(schema)}
-                    onChange={() => toggleSchema(schema)}
-                  />
-                ))}
-              </div>
-            </PopoverSurface>
-          </Popover>
+                <div className="filter-popover-list">
+                  {availableSchemas.map(schema => (
+                    <Checkbox
+                      key={schema}
+                      label={schema}
+                      checked={selectedSchemas.has(schema)}
+                      onChange={() => toggleSchema(schema)}
+                    />
+                  ))}
+                </div>
+              </PopoverSurface>
+            </Popover>
+          )}
 
-          {/* Type filter */}
-          <Popover>
-            <PopoverTrigger>
-              <Tooltip content="Filter by object type" relationship="label">
-                <Button
-                  appearance="subtle"
-                  icon={<Code24Regular />}
-                >
-                  Types ({selectedTypes.size}/{OBJECT_TYPES.length})
-                </Button>
-              </Tooltip>
-            </PopoverTrigger>
-            <PopoverSurface className="data-lineage-search__filter-popover">
-              <div className="filter-popover-header">
-                <Text weight="semibold">Object Types</Text>
-                <div className="filter-popover-actions">
-                  <Button size="small" appearance="subtle" onClick={selectAllTypes}>
-                    All
+          {/* Type filter - only show when filters are loaded */}
+          {filtersReady && (
+            <Popover>
+              <PopoverTrigger>
+                <Tooltip content="Filter by object type" relationship="label">
+                  <Button appearance="subtle" icon={<Code24Regular />}>
+                    Types ({selectedTypes.size}/{availableTypes.length})
                   </Button>
-                  <Button size="small" appearance="subtle" onClick={selectNoTypes}>
-                    None
-                  </Button>
+                </Tooltip>
+              </PopoverTrigger>
+              <PopoverSurface className="data-lineage-search__filter-popover">
+                <div className="filter-popover-header">
+                  <Text weight="semibold">Object Types</Text>
+                  <div className="filter-popover-actions">
+                    <Button size="small" appearance="subtle" onClick={selectAllTypes}>All</Button>
+                    <Button size="small" appearance="subtle" onClick={selectNoTypes}>None</Button>
+                  </div>
                 </div>
-              </div>
-              <div className="filter-popover-list">
-                {OBJECT_TYPES.map((type) => (
-                  <Checkbox
-                    key={type}
-                    label={type}
-                    checked={selectedTypes.has(type)}
-                    onChange={() => toggleType(type)}
-                  />
-                ))}
-              </div>
-            </PopoverSurface>
-          </Popover>
+                <div className="filter-popover-list">
+                  {availableTypes.map(type => (
+                    <Checkbox
+                      key={type}
+                      label={type}
+                      checked={selectedTypes.has(type)}
+                      onChange={() => toggleType(type)}
+                    />
+                  ))}
+                </div>
+              </PopoverSurface>
+            </Popover>
+          )}
         </div>
 
         <div className="data-lineage-search__header-right">
@@ -459,4 +451,4 @@ export function DataLineageSearchPage({ workloadClient }: PageProps) {
   );
 }
 
-export default DataLineageSearchPage;
+export default DataLineageSearchOverlay;

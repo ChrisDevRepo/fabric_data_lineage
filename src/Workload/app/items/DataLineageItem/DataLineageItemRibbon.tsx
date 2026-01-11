@@ -9,6 +9,7 @@
  * - All buttons use "subtle" appearance
  * - Save button is icon-only
  * - Database dropdown after Save for source selection
+ * - Export dialog for professional image export
  */
 
 import React from 'react';
@@ -19,7 +20,6 @@ import {
   ArrowMaximize24Regular,
   QuestionCircle24Regular,
   SearchSquare24Regular,
-  ArrowDownload24Regular,
   Database16Regular,
 } from '@fluentui/react-icons';
 import {
@@ -36,6 +36,8 @@ import {
   createSaveAction,
   createSettingsAction,
 } from '../../components/ItemEditor';
+import { ExportDialog } from './ExportDialog';
+import type { ExportSettings } from './exportUtils';
 import { VwSource } from './LineageService';
 
 const useStyles = makeStyles({
@@ -45,8 +47,8 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
   },
   databaseDropdown: {
-    minWidth: '140px',
-    maxWidth: '200px',
+    minWidth: '200px',
+    maxWidth: '280px',
     // Compact dropdown styling
     '& button': {
       minHeight: '24px',
@@ -65,6 +67,12 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     whiteSpace: 'nowrap',
   },
+  extraActionsContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    marginLeft: tokens.spacingHorizontalS,
+  },
 });
 
 interface DataLineageItemRibbonProps {
@@ -76,13 +84,15 @@ interface DataLineageItemRibbonProps {
   onFitView?: () => void;
   onExpand?: () => void;
   onDetailSearch?: () => void;
-  onExportImage?: () => void;
+  onExportImage?: (settings: ExportSettings) => void;
   onHelp?: () => void;
   // Database selector props
   sources?: VwSource[];
   activeSourceId?: number;
   onDatabaseChange?: (sourceId: number) => void;
   isLoadingSources?: boolean;
+  // Offline mode (demo mode or no GraphQL endpoint)
+  isOfflineMode?: boolean;
 }
 
 export function DataLineageItemRibbon({
@@ -100,6 +110,7 @@ export function DataLineageItemRibbon({
   activeSourceId,
   onDatabaseChange,
   isLoadingSources = false,
+  isOfflineMode = false,
 }: DataLineageItemRibbonProps) {
   const { t } = useTranslation();
   const styles = useStyles();
@@ -132,6 +143,8 @@ export function DataLineageItemRibbon({
       icon: ArrowSyncCircle24Regular,
       label: t('Refresh'),
       onClick: onRefresh,
+      disabled: isOfflineMode,
+      tooltip: isOfflineMode ? t('RefreshDisabledInDemoMode') : undefined,
       testId: 'ribbon-refresh-btn',
     },
     // Graph view actions (only shown when in graph view)
@@ -155,15 +168,11 @@ export function DataLineageItemRibbon({
         icon: SearchSquare24Regular,
         label: t('DetailSearch'),
         onClick: onDetailSearch || (() => {}),
+        disabled: isOfflineMode,
+        tooltip: isOfflineMode ? t('DetailSearchDisabledInDemoMode') : undefined,
         testId: 'ribbon-detailsearch-btn',
       },
-      {
-        key: 'exportImage',
-        icon: ArrowDownload24Regular,
-        label: t('ExportImage'),
-        onClick: onExportImage || (() => {}),
-        testId: 'ribbon-export-btn',
-      },
+      // Note: Export button moved to ExportDialog component (rendered separately)
     ] : []),
     {
       key: 'help',
@@ -215,6 +224,12 @@ export function DataLineageItemRibbon({
       {/* Database dropdown positioned in the ribbon header area */}
       <div className="data-lineage-ribbon-database">
         {renderDatabaseDropdown()}
+        {/* Export dialog - only shown in graph view */}
+        {isGraphView && onExportImage && (
+          <div className={styles.extraActionsContainer}>
+            <ExportDialog onExport={onExportImage} />
+          </div>
+        )}
       </div>
       <Ribbon
         homeToolbarActions={homeToolbarActions}
