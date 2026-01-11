@@ -1,93 +1,100 @@
 # Fabric Data Lineage
 
+> **See what Fabric's native lineage can't show you** — object-level dependencies inside your Data Warehouse.
+
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Fabric Extensibility Toolkit](https://img.shields.io/badge/Fabric-Extensibility%20Toolkit-purple)](https://github.com/microsoft/fabric-extensibility-toolkit)
+[![Fabric Extensibility Toolkit](https://img.shields.io/badge/Built_with-Fabric_Extensibility_Toolkit-742774)](https://github.com/microsoft/fabric-extensibility-toolkit)
 
-Microsoft Fabric workload for visualizing object-level data lineage across Fabric Data Warehouses.
+<p align="center">
+  <a href="https://youtu.be/hE5UCSByBo0">Watch Demo</a> •
+  <a href="docs/QUICKSTART.md">Quick Start</a> •
+  <a href="docs/">Documentation</a>
+</p>
 
-[Demo Video](https://www.youtube.com/watch?v=uZAk9PqHwJc) | [Documentation](docs/index.html) | [Quick Start](#quick-start)
+![Interactive lineage graph showing object dependencies](docs/images/data-lineage-gui.png)
 
-![Data Lineage Graph](docs/images/data-lineage-gui.png)
+---
+
+## The Problem
+
+Fabric shows **item-level** lineage: Pipeline → Warehouse → Report.
+
+But inside your warehouse? Hundreds of tables, views, stored procedures — all connected by SQL you can't visualize. Change one table and hope nothing breaks.
+
+**This tool fills the gap.** Trace dependencies across schemas, search DDL code, understand impact before you deploy.
+
+---
 
 ## Features
 
-- **Interactive Graph** - Pan, zoom, highlight. Nodes colored by schema, shaped by type.
-- **Trace Mode** - Right-click to trace N levels up/downstream. Double-click for quick trace.
-- **DDL Search** - Full-text search with syntax-highlighted viewer.
-- **Multi-Database** - Switch between source DWHs. Single deployment.
-- **Filtering** - Schema, type, data model classification, exclude patterns.
-- **Export** - Save graph as image.
+| | Feature | Description |
+|---|---------|-------------|
+| **Graph** | Interactive visualization | Pan, zoom, click. Nodes colored by schema, shaped by object type. |
+| **Trace** | Upstream/downstream | Right-click any object → trace N levels up or down. See what feeds it, what depends on it. |
+| **Search** | Full-text DDL search | Find every SP that references `dbo.Orders`. Syntax-highlighted viewer. |
+| **Filter** | Smart filtering | By schema, object type, data model layer. Focus on what matters. |
+| **Multi-DB** | Multiple warehouses | Switch sources with a dropdown. Track cross-database references. |
+| **Export** | Save as image | One click to PNG for documentation or reviews. |
 
-## Architecture
+---
+
+## Quick Start
+
+**Try it in 5 minutes** — Demo mode requires no database setup.
+
+| Step | Action |
+|------|--------|
+| **1** | Admin enables workloads + uploads [package](release/) ([details](docs/QUICKSTART.md#1-admin-setup)) |
+| **2** | Create **+ New → Data Lineage** item, click **Refresh** |
+| **3** | Explore the demo graph. [Connect your warehouse](setup/) when ready. |
+
+---
+
+## How It Works
 
 ```
-Source DWH → Copy Activity (Pipeline) → raw.* tables → Notebook → meta.* → GraphQL → React
+Your DWH → Copy Pipeline → Parsing Notebook → GraphQL API → React Frontend
+           (metadata only)   (DDL analysis)    (secure)      (this app)
 ```
 
-### Security
+**Security model:**
+- Your Fabric identity — no separate credentials
+- Metadata only — object names, schemas, DDL. Never reads table data.
+- Stays in your tenant — you control the pipeline and storage
 
-- **Fabric User Auth** - Your Fabric identity, no separate credentials
-- **Metadata Only** - Object names, schemas, DDL text. No table data read.
-- **You Control Extraction** - You run DMV queries via your Pipeline
-- **GraphQL Boundary** - Frontend reads only exposed GraphQL API
-
-## Scope
-
-**Included:** Fabric DWH object-level lineage (tables, views, SPs, functions), DDL parsing, multi-database
-
-**Not included:** Column-level lineage
+---
 
 ## Project Structure
 
 ```
-setup/                             # Deployment assets
-├── schema-ddl.sql                 # Database schema (DDL)
-├── LineageParser.ipynb            # DDL parsing notebook
-└── pipeline_datalineage.zip       # Copy pipeline template (import in Fabric)
-src/Workload/                      # React frontend (Fabric SDK)
-└── app/items/DataLineageItem/     # Main visualization
-    └── ...
-docs/                              # User documentation
-scripts/                           # Build and deployment
+setup/                  # Database schema, parser notebook, pipeline template
+src/Workload/           # React frontend (Fabric Extensibility SDK)
+docs/                   # User documentation
+scripts/                # Build and run scripts
+release/                # Deployable package (.nupkg)
 ```
 
-## Quick Start
-
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for setup instructions.
-
-## Development
-
-```powershell
-# Setup
-cd scripts && pwsh ./Setup/Setup.ps1 -WorkloadName "Org.DataLineage"
-cd ../src/Workload && npm install
-
-# Run (Terminal 1: DevGateway first, Terminal 2: DevServer second)
-cd scripts && pwsh ./Run/StartDevGateway.ps1
-cd scripts && pwsh ./Run/StartDevServer.ps1
-```
+---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Quick Start](docs/QUICKSTART.md) | Try demo, setup guide, admin steps |
-| [Setup Guide](setup/README.md) | Deploy database, pipeline, GraphQL |
-| [Features](docs/FEATURES.md) | Feature reference |
-| [DMV Queries](docs/DMV_QUERIES.md) | Data extraction queries |
+| Guide | Description |
+|-------|-------------|
+| [Quick Start](docs/QUICKSTART.md) | Try demo mode, admin setup, connect your data |
+| [Setup Guide](setup/README.md) | Deploy database, pipeline, GraphQL endpoint |
+| [Features](docs/FEATURES.md) | Complete feature reference |
 
 ---
 
 ## Author
 
-**Christian Wagner** - Data Architect & Engineer
+**Christian Wagner** — Data Architect & Engineer
 
-[LinkedIn](https://at.linkedin.com/in/christian-wagner-11aa8614b) | [GitHub](https://github.com/ChrisDevRepo)
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2)](https://at.linkedin.com/in/christian-wagner-11aa8614b)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717)](https://github.com/ChrisDevRepo)
 
 ---
 
-> Built with the [Microsoft Fabric Extensibility Toolkit](https://github.com/microsoft/fabric-extensibility-toolkit)
+<p align="center">
+  <sub>MIT License • Built with the <a href="https://github.com/microsoft/fabric-extensibility-toolkit">Microsoft Fabric Extensibility Toolkit</a> and <a href="https://claude.ai/claude-code">Claude Code</a></sub>
+</p>
