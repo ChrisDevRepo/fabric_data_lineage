@@ -3,7 +3,7 @@
  *
  * Reusable Monaco Editor wrapper for displaying SQL DDL definitions.
  * Used by:
- * - DataLineageSearchPage (full-text search)
+ * - DataLineageSearchOverlay (full-text search)
  * - DDLViewerPanel (side panel)
  *
  * Features:
@@ -304,7 +304,7 @@ export function DDLViewer({
           value={ddlText}
           options={MONACO_EDITOR_OPTIONS}
           onMount={handleEditorMount}
-          theme="vs" // Light theme to match Fabric
+          theme="vs" // TODO: Detect Fabric theme for dark mode support
         />
       </div>
     </div>

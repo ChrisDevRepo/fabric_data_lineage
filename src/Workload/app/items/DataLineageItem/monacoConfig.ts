@@ -3,7 +3,7 @@
  *
  * Shared configuration for Monaco Editor instances used in:
  * - DDLViewerPanel (side panel)
- * - DataLineageSearchPage (full-text search)
+ * - DataLineageSearchOverlay (full-text search)
  *
  * CRITICAL: domReadOnly must be true to prevent editor from capturing
  * keyboard events from search inputs and other form elements.
