@@ -91,6 +91,8 @@ interface DataLineageItemRibbonProps {
   activeSourceId?: number;
   onDatabaseChange?: (sourceId: number) => void;
   isLoadingSources?: boolean;
+  // Offline mode (demo mode or no GraphQL endpoint)
+  isOfflineMode?: boolean;
 }
 
 export function DataLineageItemRibbon({
@@ -108,6 +110,7 @@ export function DataLineageItemRibbon({
   activeSourceId,
   onDatabaseChange,
   isLoadingSources = false,
+  isOfflineMode = false,
 }: DataLineageItemRibbonProps) {
   const { t } = useTranslation();
   const styles = useStyles();
@@ -140,6 +143,8 @@ export function DataLineageItemRibbon({
       icon: ArrowSyncCircle24Regular,
       label: t('Refresh'),
       onClick: onRefresh,
+      disabled: isOfflineMode,
+      tooltip: isOfflineMode ? t('RefreshDisabledInDemoMode') : undefined,
       testId: 'ribbon-refresh-btn',
     },
     // Graph view actions (only shown when in graph view)
@@ -163,6 +168,8 @@ export function DataLineageItemRibbon({
         icon: SearchSquare24Regular,
         label: t('DetailSearch'),
         onClick: onDetailSearch || (() => {}),
+        disabled: isOfflineMode,
+        tooltip: isOfflineMode ? t('DetailSearchDisabledInDemoMode') : undefined,
         testId: 'ribbon-detailsearch-btn',
       },
       // Note: Export button moved to ExportDialog component (rendered separately)

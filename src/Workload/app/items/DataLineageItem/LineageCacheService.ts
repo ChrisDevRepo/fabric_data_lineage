@@ -42,40 +42,6 @@ const CACHE_VERSION = 1; // Increment when DataNode schema changes
  * LineageCacheService for localStorage-based caching
  */
 export class LineageCacheService {
-  /**
-   * Get the global sources cache key (item-level, not per-source)
-   */
-  private static getSourcesKey(itemId: string): string {
-    return `${CACHE_PREFIX}${itemId}_sources`;
-  }
-
-  /**
-   * Save sources list globally (for offline dropdown)
-   */
-  static setCachedSources(itemId: string, sources: VwSource[]): void {
-    try {
-      const data = { sources, timestamp: new Date().toISOString(), version: CACHE_VERSION };
-      localStorage.setItem(LineageCacheService.getSourcesKey(itemId), JSON.stringify(data));
-    } catch {
-      // localStorage might be full - silently fail
-    }
-  }
-
-  /**
-   * Get cached sources list (for offline dropdown fallback)
-   */
-  static getCachedSources(itemId: string): VwSource[] | null {
-    try {
-      const raw = localStorage.getItem(LineageCacheService.getSourcesKey(itemId));
-      if (!raw) return null;
-      const data = JSON.parse(raw);
-      if (data.version !== CACHE_VERSION) return null;
-      return data.sources || null;
-    } catch {
-      return null;
-    }
-  }
-
   private itemId: string;
   private sourceId: number | undefined;
   private ttlMinutes: number;
@@ -106,6 +72,7 @@ export class LineageCacheService {
 
   /**
    * Check if cached data exists and is valid
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   hasValidCache(endpoint?: string): boolean {
     try {
@@ -118,6 +85,11 @@ export class LineageCacheService {
       // Check endpoint match (if provided)
       if (endpoint && cached.endpoint !== endpoint) return false;
 
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return false;
+      }
+
       // Check TTL
       const ageMs = Date.now() - new Date(cached.timestamp).getTime();
       const ttlMs = this.ttlMinutes * 60 * 1000;
@@ -129,6 +101,7 @@ export class LineageCacheService {
 
   /**
    * Get cached data (returns null if no cache or expired)
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   get(endpoint?: string): DataNode[] | null {
     try {
@@ -144,6 +117,12 @@ export class LineageCacheService {
       // Check endpoint match (if provided)
       if (endpoint && cached.endpoint !== endpoint) return null;
 
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      // If cache has a sourceId but it doesn't match current, reject cache
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return null;
+      }
+
       // Return cached data regardless of age (stale-while-revalidate pattern)
       return cached.data;
     } catch {
@@ -153,11 +132,18 @@ export class LineageCacheService {
 
   /**
    * Get stale data even if expired (for fallback when fetch fails)
+   * IMPORTANT: Validates sourceId to prevent dropdown/graph mismatch
    */
   getStale(): DataNode[] | null {
     try {
       const cached = this.getRawCache();
       if (!cached || cached.version !== CACHE_VERSION) return null;
+
+      // CRITICAL: Validate sourceId matches to prevent dropdown/graph mismatch
+      if (cached.sourceId !== undefined && cached.sourceId !== this.sourceId) {
+        return null;
+      }
+
       return cached.data;
     } catch {
       return null;

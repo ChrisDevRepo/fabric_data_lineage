@@ -23,7 +23,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Help panel footer simplified
 - Filter settings now use 2-tier storage: localStorage for session (24h), explicit Save for team defaults
 - DDLViewerPanel refactored to use shared DDLViewer component (reduced code duplication)
-- Detail Search filters synced from editor via sessionStorage (no duplicate dropdowns)
+- Detail Search filters synced from editor via sessionStorage (Schema/Types dropdowns match main toolbar)
 
 ### Added
 - Spinner accessibility labels (aria-label)

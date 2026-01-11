@@ -83,6 +83,8 @@
     "Expand_Failed_Message": "Could not open expanded view",
     "DetailSearch_Failed": "Search Panel Failed",
     "DetailSearch_Failed_Message": "Could not open search panel",
+    "RefreshDisabledInDemoMode": "Refresh is not available in demo mode",
+    "DetailSearchDisabledInDemoMode": "Detail Search is not available in demo mode",
 
     "Settings_Title": "Data Lineage Settings",
     "Settings_Tab_Connection": "Connection",

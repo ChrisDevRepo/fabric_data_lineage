@@ -18,6 +18,7 @@ import {
   Button,
   Link,
   Text,
+  Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -189,12 +190,14 @@ export function DataLineageHelpPanel({ workloadClient }: DataLineageHelpPanelPro
               {t('Help_Title')}
             </Text>
           </div>
-          <Button
-            appearance="subtle"
-            icon={<Dismiss24Regular />}
-            onClick={handleClose}
-            aria-label={t('Close')}
-          />
+          <Tooltip content={t('Close')} relationship="label">
+            <Button
+              appearance="subtle"
+              icon={<Dismiss24Regular />}
+              onClick={handleClose}
+              aria-label={t('Close')}
+            />
+          </Tooltip>
         </div>
         <Text className={styles.subtitle}>
           {t('Help_Subtitle')}

@@ -37,9 +37,11 @@ export interface DDLViewerPanelProps {
   onClose: () => void;
   service: LineageService | null;
   sourceId?: number;
+  /** Whether demo mode is active (shows "not available" message instead of loading DDL) */
+  isDemo?: boolean;
 }
 
-export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDLViewerPanelProps) {
+export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId, isDemo = false }: DDLViewerPanelProps) {
   const editorRef = useRef<any>(null);
   const { ddlText, isLoading, error, loadDdl, retry, clear } = useDdlLoader(service);
 
@@ -139,6 +141,17 @@ export function DDLViewerPanel({ node, isOpen, onClose, service, sourceId }: DDL
             </Text>
             <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
               Right-click a node and select "View DDL" to see its definition
+            </Text>
+          </div>
+        ) : isDemo ? (
+          // Demo mode - DDL not available
+          <div className="ddl-viewer-panel__empty">
+            <Code24Regular style={{ fontSize: 48, color: tokens.colorNeutralForeground4 }} />
+            <Text size={400} style={{ color: tokens.colorNeutralForeground2 }}>
+              Not available in demo mode
+            </Text>
+            <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
+              Connect to a GraphQL endpoint in Settings to view SQL definitions.
             </Text>
           </div>
         ) : (

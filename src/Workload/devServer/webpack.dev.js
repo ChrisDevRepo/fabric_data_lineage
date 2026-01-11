@@ -5,8 +5,8 @@ const Webpack = require("webpack");
 const { registerDevServerApis, registerDevServerComponents } = require('.'); // Import our dev server functions
 
 
-// making sure the dev configuration is set correctly!
-// TODO: once we use the manifest for publishing we can remove this.
+// Map .env variables to DEV_AAD_CONFIG_* format expected by manifestApi.js
+// This follows the Microsoft Fabric Extensibility Toolkit pattern
 process.env.DEV_AAD_CONFIG_FE_APPID = process.env.FRONTEND_APPID;
 process.env.DEV_AAD_CONFIG_BE_APPID = process.env.BACKEND_APPID;
 process.env.DEV_AAD_CONFIG_BE_AUDIENCE= ""

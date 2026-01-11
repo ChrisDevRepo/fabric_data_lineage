@@ -646,8 +646,8 @@ function DataLineageGraphInner({
       // External nodes don't support context menu
       if (dataNode.is_external) return;
 
-      // DDL is available for Views, Stored Procedures, Functions (not Tables)
-      const hasDdlType = ['View', 'Stored Procedure', 'Function'].includes(dataNode.object_type);
+      // DDL is available for Tables, Views, Stored Procedures, Functions
+      const hasDdlType = ['Table', 'View', 'Stored Procedure', 'Function'].includes(dataNode.object_type);
 
       // Parse object_id from composite id string (format: {source_id}_{object_id})
       const objectId = parseInt(dataNode.id.split('_')[1], 10);
@@ -734,10 +734,7 @@ function DataLineageGraphInner({
 
   // Handle export to image (with settings from dialog)
   const handleExportToImage = useCallback((settings: ExportSettings) => {
-    if (nodes.length === 0) {
-      console.warn('No nodes to export');
-      return;
-    }
+    if (nodes.length === 0) return;
 
     exportGraphToImage({
       reactFlowInstance,
@@ -960,6 +957,7 @@ function DataLineageGraphInner({
           onClose={() => setDdlViewerNode(null)}
           service={service || null}
           sourceId={sourceId}
+          isDemo={isDemo}
         />
       </div>
     </div>
