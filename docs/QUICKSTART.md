@@ -1,6 +1,6 @@
 # Quick Start
 
-## 1. Try the Demo*
+## 1. Try the Demo
 
 ### Admin Setup (one-time)
 
@@ -12,9 +12,9 @@ Your Fabric tenant admin must complete these steps:
    - "Users can see and work with additional workloads not validated by Microsoft"
    [Documentation](https://learn.microsoft.com/en-us/fabric/admin/tenant-settings-index#additional-workloads)
 
-2. **Grant admin consent**
+2. **Grant tenant-wide admin consent** ([details](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent))
 
-   Allows users in your tenant to sign in to this app. [What is admin consent?](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
+   For demo/testing, the hosted app can be used.*
 
    | | |
    |---|---|
@@ -65,4 +65,4 @@ For production or internal use, clone this repo and deploy to your own Azure env
 
 ---
 
-<sub>* The hosted app (chwagner.eu) is provided for evaluation and testing only. No availability guarantee. For production or internal use, deploy your own instance — you control uptime and own the complete solution.</sub>
+> *The hosted demo (chwagner.eu) is for evaluation only — no availability guarantee. For production use, deploy your own instance.
